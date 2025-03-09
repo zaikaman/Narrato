@@ -14,6 +14,41 @@ from asgiref.sync import sync_to_async
 import re
 import traceback
 
+class APIKeyManager:
+    """Quản lý và luân phiên sử dụng các API key"""
+    def __init__(self):
+        self.google_keys = [
+            os.getenv('GOOGLE_API_KEY'),
+            os.getenv('GOOGLE_API_KEY_2'),
+            os.getenv('GOOGLE_API_KEY_3'),
+            os.getenv('GOOGLE_API_KEY_4')
+        ]
+        self.current_key_index = 0
+        self.key_usage = {key: 0 for key in self.google_keys}
+        self._lock = asyncio.Lock()
+    
+    async def get_next_key(self):
+        """Lấy API key tiếp theo theo round-robin"""
+        async with self._lock:
+            self.current_key_index = (self.current_key_index + 1) % len(self.google_keys)
+            key = self.google_keys[self.current_key_index]
+            self.key_usage[key] += 1
+            return key
+    
+    def get_current_key(self):
+        """Lấy API key hiện tại"""
+        return self.google_keys[self.current_key_index]
+    
+    async def get_least_used_key(self):
+        """Lấy API key được sử dụng ít nhất"""
+        async with self._lock:
+            key = min(self.key_usage.items(), key=lambda x: x[1])[0]
+            self.key_usage[key] += 1
+            return key
+
+# Khởi tạo API key manager
+api_key_manager = APIKeyManager()
+
 app = Flask(__name__)
 load_dotenv()
 
@@ -100,6 +135,27 @@ async def generate_image(prompt):
         print("=== Kết thúc generate_image với exception ===\n")
         return None
 
+def find_character(name, char_db):
+    """Tìm thông tin nhân vật trong database
+    
+    Args:
+        name (str): Tên nhân vật cần tìm
+        char_db (dict): Database chứa thông tin nhân vật
+        
+    Returns:
+        tuple: (character_data, character_type) hoặc (None, None) nếu không tìm thấy
+    """
+    for char in char_db.get('main_characters', []):
+        if char['name'].lower() == name.lower():
+            return char, 'main'
+    for char in char_db.get('supporting_characters', []):
+        if char['name'].lower() == name.lower():
+            return char, 'supporting'
+    for group in char_db.get('groups', []):
+        if group['name'].lower() == name.lower():
+            return group, 'group'
+    return None, None
+
 @sync_to_async
 def generate_voice(text, voice_id="pNInz6obpgDQGcFmaJgB"):
     """Tạo giọng đọc từ văn bản sử dụng ElevenLabs"""
@@ -125,48 +181,61 @@ def generate_voice(text, voice_id="pNInz6obpgDQGcFmaJgB"):
         print(f"Lỗi khi tạo giọng đọc: {str(e)}")
         return None
 
-@sync_to_async
-def generate_story_content(prompt):
+async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
     """Tạo nội dung câu chuyện bằng Gemini"""
     try:
         print(f"\n=== Bắt đầu generate_story_content ===")
         print(f"Input prompt: {prompt}")
         
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        print("Đã khởi tạo model Gemini")
+        # Lấy API key ít được sử dụng nhất
+        api_key = await api_key_manager.get_least_used_key()
+        genai.configure(api_key=api_key)
+        print("Đã khởi tạo model Gemini với API key mới")
         
+        model = genai.GenerativeModel('gemini-2.0-flash')
         print("Gửi yêu cầu tạo câu chuyện...")
         english_story_response = model.generate_content(f"""
-        You are a storyteller writing for a general audience. Create a story based on this theme: {prompt}
+        You are a master storyteller writing an engaging and detailed story for a general audience. 
+        Create a rich, vivid story based on this theme: {prompt}
 
         IMPORTANT WRITING GUIDELINES:
-        1. Use simple, everyday language that everyone can understand
-        2. Avoid complex vocabulary or literary devices
-        3. Write short, clear sentences
-        4. Use common words instead of sophisticated alternatives
-        5. Keep the narrative straightforward and easy to follow
-        6. Write as if you're telling the story to a friend
-        7. Aim for a reading level suitable for ages 12 and up
-        8. Focus on making the story engaging through the plot, not complex language
+        1. Write detailed, descriptive paragraphs that paint a clear picture
+        2. Each paragraph should be 3-5 sentences long and focus on one scene or moment
+        3. Use sensory details to bring scenes to life (sights, sounds, smells, textures, etc.)
+        4. Balance dialogue, action, and description
+        5. Include character emotions and internal thoughts
+        6. Use simple but expressive language that everyone can understand
+        7. Create smooth transitions between paragraphs
+        8. Maintain a steady pace - don't rush through important moments
+        9. Show character development through actions and reactions
+        10. Build tension and emotional investment throughout the story
+
+        PARAGRAPH STRUCTURE:
+        - Start with scene-setting details
+        - Add character actions and reactions
+        - Include relevant dialogue or internal thoughts
+        - End with a hook to the next paragraph
+        - Each paragraph should be a mini-scene that moves the story forward
 
         Return the story in this EXACT JSON format, with NO additional text or formatting:
         {{
             "title": "Story Title",
             "paragraphs": [
-                "First paragraph text",
-                "Second paragraph text",
-                ... (between 30-50 paragraphs)
+                "First detailed paragraph text (3-5 sentences)",
+                "Second detailed paragraph text (3-5 sentences)",
+                ... (between {min_paragraphs}-{max_paragraphs} paragraphs)
             ],
             "moral": "The moral lesson from the story"
         }}
 
         IMPORTANT FORMAT RULES:
         - Do NOT add trailing commas after the last item in arrays or objects
-        - Each paragraph should be 2-3 simple sentences
+        - Each paragraph must be 3-5 sentences long with rich details
         - Story should match the theme: {prompt}
         - Return ONLY the JSON object, no other text
-        - Number of paragraphs should be between 30 and 50
-        - The story should feel complete, don't force it to exactly 50 paragraphs
+        - Number of paragraphs should be between {min_paragraphs} and {max_paragraphs}
+        - The story should feel complete, don't force it to exactly {max_paragraphs} paragraphs
+        - Focus on quality and detail in each paragraph
         """)
         
         print("Đã nhận response từ Gemini")
@@ -176,7 +245,7 @@ def generate_story_content(prompt):
         print(f"Raw response: {response_text}")
         
         # Loại bỏ markdown code blocks
-        response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text, flags=re.MULTILINE)
+        response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
         
         # Loại bỏ dấu phẩy thừa sau phần tử cuối của mảng và object
         response_text = re.sub(r',(\s*[\]}])', r'\1', response_text)
@@ -198,12 +267,12 @@ def generate_story_content(prompt):
             
             # Đảm bảo số lượng đoạn văn nằm trong khoảng 30-50
             num_paragraphs = len(story_data['paragraphs'])
-            if num_paragraphs > 50:
-                print(f"Trimming paragraphs from {num_paragraphs} to 50")
-                story_data['paragraphs'] = story_data['paragraphs'][:50]
-            elif num_paragraphs < 30:
-                print(f"Adding paragraphs to reach minimum 30 (current: {num_paragraphs})")
-                while len(story_data['paragraphs']) < 30:
+            if num_paragraphs > max_paragraphs:
+                print(f"Trimming paragraphs from {num_paragraphs} to {max_paragraphs}")
+                story_data['paragraphs'] = story_data['paragraphs'][:max_paragraphs]
+            elif num_paragraphs < min_paragraphs:
+                print(f"Adding paragraphs to reach minimum {min_paragraphs} (current: {num_paragraphs})")
+                while len(story_data['paragraphs']) < min_paragraphs:
                     story_data['paragraphs'].append("And the story continues...")
             
             print(f"Final number of paragraphs: {len(story_data['paragraphs'])}")
@@ -215,7 +284,7 @@ def generate_story_content(prompt):
             print("=== Kết thúc generate_story_content với lỗi parsing ===\n")
             return {
                 "title": "Error Creating Story",
-                "paragraphs": ["We encountered an error while creating your story."] * 30,
+                "paragraphs": ["We encountered an error while creating your story."] * min_paragraphs,
                 "moral": "Sometimes we need to be patient and try again."
             }
     except Exception as e:
@@ -224,170 +293,96 @@ def generate_story_content(prompt):
         print("=== Kết thúc generate_story_content với exception ===\n")
         raise
 
-@sync_to_async
-def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, previous_prompts=None):
-    """Tạo prompt cho hình ảnh bằng Gemini, với thông tin về nhân vật để giữ tính nhất quán"""
+async def analyze_story_characters(story_data):
+    """Phân tích và tạo mô tả nhất quán cho tất cả nhân vật trong câu chuyện"""
     try:
         model = genai.GenerativeModel('gemini-2.0-flash')
         
-        # Khởi tạo style guide chung cho toàn bộ câu chuyện
-        if paragraph_index == 0 and story_data:
-            style_guide = model.generate_content(f"""
-            Create a consistent art style guide for this story. Read the title and first few paragraphs:
-            Title: {story_data['title']}
-            Story start: {' '.join(story_data['paragraphs'][:5])}
+        character_analysis = model.generate_content(f"""
+        You are a character designer creating consistent descriptions for all characters in this story.
+        Analyze the entire story carefully and create detailed, consistent descriptions that will be used for ALL images.
+        
+        Title: {story_data['title']}
+        Story: {' '.join(story_data['paragraphs'])}
 
-            Return ONLY a JSON object in this format, no other text:
-            {{
-                "art_style": {{
-                    "overall_style": "Main art style description",
-                    "color_palette": "Specific color scheme to use throughout",
-                    "lighting": "Consistent lighting approach",
-                    "composition": "Standard composition guidelines",
-                    "texture": "Texture treatment across all images",
-                    "perspective": "How scenes should be framed"
-                }}
-            }}
-            """)
-            
-            try:
-                # Làm sạch response text
-                style_text = style_guide.text.strip()
-                # Loại bỏ markdown code blocks nếu có
-                style_text = re.sub(r'```(?:json)?\s*|\s*```', '', style_text)
-                print(f"Style guide response: {style_text}")
-                
-                style_data = json.loads(style_text)
-                if not style_data.get('art_style'):
-                    raise ValueError("Missing art_style in response")
-                    
-                story_data['style_guide'] = style_data
-                print("Successfully parsed style guide")
-            except Exception as e:
-                print(f"Could not parse style guide: {str(e)}")
-                print(f"Raw response: {style_guide.text}")
-                style_data = {
-                    "art_style": {
-                        "overall_style": "Digital art style with realistic details",
-                        "color_palette": "Rich, vibrant colors with deep contrasts",
-                        "lighting": "Dramatic lighting with strong highlights and shadows",
-                        "composition": "Dynamic, cinematic compositions",
-                        "texture": "Detailed textures with fine grain",
-                        "perspective": "Varied angles to enhance dramatic effect"
-                    }
-                }
-                story_data['style_guide'] = style_data
-
-            # Phân tích nhân vật chi tiết hơn
-            character_analysis = model.generate_content(f"""
-            Analyze ALL characters that appear in this story. Read through the entire story carefully:
-            Title: {story_data['title']}
-            Story: {' '.join(story_data['paragraphs'])}
-
-            Return ONLY a JSON object in this format, no other text:
-            {{
-                "main_character": {{
-                    "name": "Character name",
-                    "age": "Specific age",
-                    "gender": "Character gender",
-                    "physical_traits": {{
-                        "height": "Height description",
-                        "build": "Body build description",
-                        "hair": "Detailed hair description including style and color",
-                        "eyes": "Eye color and shape",
-                        "skin": "Skin tone and texture",
-                        "face_shape": "Detailed face shape description",
-                        "distinctive_features": "Any unique identifying marks or features"
-                    }},
-                    "clothing": {{
-                        "style": "Overall clothing style",
-                        "main_outfit": "Detailed description of typical outfit",
-                        "color_scheme": "Consistent colors in clothing",
-                        "accessories": "Regular accessories worn"
-                    }},
-                    "personality_reflection": "How personality should be reflected in appearance and poses"
-                }},
-                "supporting_characters": [
-                    {{
-                        "name": "Character name",
-                        "relationship": "Relationship to main character",
-                        "physical_traits": {{
-                            "height": "Height description",
-                            "build": "Body build description",
-                            "hair": "Hair details",
-                            "face": "Face description",
-                            "distinctive_features": "Unique features"
+        Requirements:
+        1. Identify ALL named and unnamed but important characters
+        2. Create VERY detailed descriptions that will remain consistent
+        3. Include specific details about appearance, clothing, and expressions
+        4. Use exact measurements and specific colors where possible
+        5. Consider character development/changes throughout the story
+        
+        Return ONLY a JSON object in this format:
+        {{
+            "main_characters": [
+                {{
+                    "name": "Character's name or identifier",
+                    "role": "Role in story",
+                    "base_description": "Complete physical description to use in EVERY image",
+                    "variations": [
+                        {{
+                            "trigger_keywords": ["sad", "crying", "upset"],
+                            "expression_override": "Detailed description of sad expression and posture"
                         }},
-                        "clothing": {{
-                            "style": "Character's clothing style",
-                            "color_scheme": "Consistent colors"
+                        {{
+                            "trigger_keywords": ["happy", "joyful", "laughing"],
+                            "expression_override": "Detailed description of happy expression and posture"
                         }}
-                    }}
-                ]
-            }}
-            """)
-            
-            try:
-                # Làm sạch response text
-                char_text = character_analysis.text.strip()
-                # Loại bỏ markdown code blocks nếu có
-                char_text = re.sub(r'```(?:json)?\s*|\s*```', '', char_text)
-                print(f"Character analysis response: {char_text}")
-                
-                char_data = json.loads(char_text)
-                if not char_data.get('main_character'):
-                    raise ValueError("Missing main_character in response")
-                if not char_data.get('supporting_characters'):
-                    raise ValueError("Missing supporting_characters in response")
-                    
-                story_data['character_info'] = char_data
-                print("Successfully parsed character analysis")
-            except Exception as e:
-                print(f"Could not parse character analysis: {str(e)}")
-                print(f"Raw response: {character_analysis.text}")
-                # Tạo dữ liệu mặc định từ nội dung câu chuyện
-                char_data = {
-                    "main_character": {
-                        "name": "King Alaric",
-                        "age": "young",
-                        "gender": "male",
-                        "physical_traits": {
-                            "height": "tall and imposing",
-                            "build": "strong and regal",
-                            "hair": "well-groomed auburn hair",
-                            "eyes": "piercing blue eyes",
-                            "skin": "fair and smooth",
-                            "face_shape": "noble features with strong jawline",
-                            "distinctive_features": "carries himself with royal bearing"
-                        },
-                        "clothing": {
-                            "style": "royal and elegant",
-                            "main_outfit": "ornate royal robes with gold trim",
-                            "color_scheme": "deep blues and rich golds",
-                            "accessories": "golden crown and royal signet ring"
-                        },
-                        "personality_reflection": "regal bearing with hints of inner turmoil"
-                    },
-                    "supporting_characters": [
-                        {
-                            "name": "Sir Kaelen",
-                            "relationship": "loyal knight and confidant",
-                            "physical_traits": {
-                                "height": "tall and athletic",
-                                "build": "strong and battle-hardened",
-                                "hair": "silver-streaked dark hair",
-                                "face": "noble and determined",
-                                "distinctive_features": "battle scars and proud bearing"
-                            },
-                            "clothing": {
-                                "style": "polished plate armor with royal insignia",
-                                "color_scheme": "silver and blue"
-                            }
-                        }
+                    ],
+                    "relationships": ["Relationship with other characters"],
+                    "development_points": [
+                        {{
+                            "story_point": "Key story event",
+                            "appearance_change": "How appearance changes after this point"
+                        }}
                     ]
-                }
-                story_data['character_info'] = char_data
-            story_data['previous_prompts'] = []  # Thêm list để lưu lịch sử prompts
+                }}
+            ],
+            "supporting_characters": [
+                // Same structure as main characters
+            ],
+            "groups": [
+                {{
+                    "name": "Group identifier",
+                    "members_description": "Consistent description for group members",
+                    "variations": []
+                }}
+            ]
+        }}
+        """)
+        
+        try:
+            char_text = character_analysis.text.strip()
+            char_text = re.sub(r'```(?:json)?\s*|\s*```', '', char_text)
+            print(f"Character analysis response: {char_text}")
+            
+            char_data = json.loads(char_text)
+            if not (char_data.get('main_characters') or char_data.get('supporting_characters')):
+                raise ValueError("Missing character data in response")
+                
+            # Thêm vào story_data
+            story_data['character_database'] = char_data
+            print("Successfully created character database")
+            return char_data
+            
+        except Exception as e:
+            print(f"Could not parse character analysis: {str(e)}")
+            print(f"Raw response: {character_analysis.text}")
+            return None
+            
+    except Exception as e:
+        print(f"Error in analyze_story_characters: {str(e)}")
+        return None
+
+async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, previous_prompts=None):
+    """Tạo prompt cho hình ảnh bằng Gemini, với thông tin về nhân vật để giữ tính nhất quán"""
+    try:
+        # Lấy API key tiếp theo theo round-robin
+        api_key = await api_key_manager.get_next_key()
+        genai.configure(api_key=api_key)
+        print(f"Sử dụng API key mới cho generate_image_prompt")
+        
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         # Lấy lịch sử prompts từ story_data
         previous_prompts = story_data.get('previous_prompts', []) if story_data else []
@@ -400,64 +395,63 @@ def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, previou
             {chr(10).join(f"{i+1}. {prompt}" for i, prompt in enumerate(previous_prompts))}
             """
 
-        char_data = story_data.get('character_info') if story_data else None
-        style_data = story_data.get('style_guide') if story_data else None
+        # Phân tích đoạn văn để xác định nhân vật xuất hiện
+        character_mention_analysis = model.generate_content(f"""
+        Analyze this paragraph and identify which characters appear in it.
+        Also identify their emotional state or any significant changes in appearance.
+        
+        Paragraph: "{paragraph}"
 
-        # Tạo prompt chi tiết với thông tin nhân vật và style guide
-        character_context = ""
+        Return ONLY a JSON object in this format:
+        {{
+            "characters": [
+                {{
+                    "name": "Character name or identifier",
+                    "emotional_state": ["happy", "excited"],
+                    "appearance_change": "Any story-driven changes to note"
+                }}
+            ]
+        }}
+        """)
+        
+        try:
+            char_mentions = json.loads(character_mention_analysis.text)
+            mentioned_chars = char_mentions.get('characters', [])
+        except:
+            mentioned_chars = []
+
+        # Lấy thông tin nhân vật từ character_database
+        character_descriptions = []
+        char_db = story_data.get('character_database', {})
+        
+        # Xây dựng mô tả nhân vật dựa trên trạng thái cảm xúc và thay đổi
+        for mention in mentioned_chars:
+            char_name = mention.get('name')
+            char_data, char_type = find_character(char_name, char_db)
+            
+            if char_data:
+                description = char_data.get('base_description', '')
+                
+                # Thêm biểu cảm dựa trên trạng thái cảm xúc
+                emotions = mention.get('emotional_state', [])
+                for variation in char_data.get('variations', []):
+                    if any(emotion in variation['trigger_keywords'] for emotion in emotions):
+                        description = f"{description}, {variation['expression_override']}"
+                
+                # Thêm thay đổi ngoại hình nếu có
+                appearance_change = mention.get('appearance_change')
+                if appearance_change:
+                    for dev_point in char_data.get('development_points', []):
+                        if appearance_change.lower() in dev_point['story_point'].lower():
+                            description = f"{description}, {dev_point['appearance_change']}"
+                
+                character_descriptions.append(description)
+
+        character_context = "Character descriptions (MUST be followed exactly):\n" + "\n\n".join(character_descriptions) if character_descriptions else ""
+
+        style_data = story_data.get('style_guide') if story_data else None
         style_context = ""
         
-        if char_data:
-            main_char = char_data.get('main_character', {})
-            physical_traits = main_char.get('physical_traits', {})
-            clothing = main_char.get('clothing', {})
-            
-            # Phân tích đoạn văn để xác định nhân vật xuất hiện
-            character_mention_analysis = model.generate_content(f"""
-            Analyze this paragraph and identify which characters appear in it:
-            {paragraph}
-
-            Return ONLY a JSON array of character names, no other text:
-            ["Character1", "Character2", ...]
-            """)
-            
-            try:
-                mentioned_characters = json.loads(character_mention_analysis.text)
-            except:
-                mentioned_characters = []
-
-            # Tạo mô tả chi tiết cho mỗi nhân vật xuất hiện trong đoạn
-            character_descriptions = []
-            
-            # Kiểm tra nhân vật chính
-            main_char_name = main_char.get('name', '')
-            if main_char_name in mentioned_characters:
-                character_descriptions.append(f"""
-                {main_char_name}: {main_char.get('age', '')} year old {main_char.get('gender', '')}, 
-                {physical_traits.get('height', '')}, {physical_traits.get('build', '')}, 
-                with {physical_traits.get('hair', '')} and {physical_traits.get('eyes', '')} eyes,
-                {physical_traits.get('skin', '')} skin tone, {physical_traits.get('face_shape', '')} face,
-                {physical_traits.get('distinctive_features', '')}.
-                Wearing {clothing.get('main_outfit', '')}, {clothing.get('accessories', '')}.
-                Their expression and pose reflect {main_char.get('personality_reflection', '')}.
-                """.strip())
-
-            # Kiểm tra các nhân vật phụ
-            for char in char_data.get('supporting_characters', []):
-                char_name = char.get('name', '')
-                if char_name in mentioned_characters:
-                    char_traits = char.get('physical_traits', {})
-                    char_clothing = char.get('clothing', {})
-                    character_descriptions.append(f"""
-                    {char_name}: {char.get('relationship', '')},
-                    {char_traits.get('height', '')}, {char_traits.get('build', '')},
-                    with {char_traits.get('hair', '')} and {char_traits.get('face', '')},
-                    {char_traits.get('distinctive_features', '')}.
-                    Wearing {char_clothing.get('style', '')} in {char_clothing.get('color_scheme', '')}.
-                    """.strip())
-
-            character_context = "Character descriptions (MUST be followed exactly):\n" + "\n\n".join(character_descriptions) if character_descriptions else ""
-
         if style_data:
             art_style = style_data.get('art_style', {})
             style_context = f"""
@@ -527,15 +521,75 @@ async def generate_story():
     print("\n=== Bắt đầu generate_story endpoint ===")
     prompt = request.form.get('prompt')
     image_mode = request.form.get('imageMode', 'generate')  # Mặc định là tạo ảnh
+    min_paragraphs = int(request.form.get('minParagraphs', 30))  # Mặc định là 30
+    max_paragraphs = int(request.form.get('maxParagraphs', 50))  # Mặc định là 50
     print(f"Received prompt: {prompt}")
     print(f"Image mode: {image_mode}")
+    print(f"Paragraph range: {min_paragraphs}-{max_paragraphs}")
     
     try:
         # Tạo nội dung câu chuyện
         print("Generating story content...")
-        story_data = await generate_story_content(prompt)
+        story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
         story_data['previous_prompts'] = []  # Khởi tạo list lưu lịch sử prompts
         print("Story content generated successfully")
+
+        # Tạo style guide
+        print("Generating style guide...")
+        api_key = await api_key_manager.get_next_key()
+        genai.configure(api_key=api_key)
+        print("Sử dụng API key mới cho style guide")
+        
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        style_guide = model.generate_content(f"""
+        Create a consistent art style guide for this story. Read the title and first few paragraphs:
+        Title: {story_data['title']}
+        Story start: {' '.join(story_data['paragraphs'][:5])}
+
+        Return ONLY a JSON object in this format, no other text:
+        {{
+            "art_style": {{
+                "overall_style": "Main art style description",
+                "color_palette": "Specific color scheme to use throughout",
+                "lighting": "Consistent lighting approach",
+                "composition": "Standard composition guidelines",
+                "texture": "Texture treatment across all images",
+                "perspective": "How scenes should be framed"
+            }}
+        }}
+        """)
+        
+        try:
+            style_text = style_guide.text.strip()
+            style_text = re.sub(r'```(?:json)?\s*|\s*```', '', style_text)
+            style_data = json.loads(style_text)
+            if not style_data.get('art_style'):
+                raise ValueError("Missing art_style in response")
+            story_data['style_guide'] = style_data
+            print("Successfully created style guide")
+        except Exception as e:
+            print(f"Could not parse style guide: {str(e)}")
+            story_data['style_guide'] = {
+                "art_style": {
+                    "overall_style": "Digital art style with realistic details",
+                    "color_palette": "Rich, vibrant colors with deep contrasts",
+                    "lighting": "Dramatic lighting with strong highlights and shadows",
+                    "composition": "Dynamic, cinematic compositions",
+                    "texture": "Detailed textures with fine grain",
+                    "perspective": "Varied angles to enhance dramatic effect"
+                }
+            }
+
+        # Phân tích và tạo cơ sở dữ liệu nhân vật
+        print("Analyzing characters...")
+        char_data = await analyze_story_characters(story_data)
+        if not char_data:
+            print("Failed to create character database, using default")
+            story_data['character_database'] = {
+                "main_characters": [],
+                "supporting_characters": [],
+                "groups": []
+            }
         
         # Tạo prompts cho hình ảnh theo batch để tránh rate limit
         print("Generating image prompts...")
@@ -556,10 +610,10 @@ async def generate_story():
             
             image_prompts.extend(batch_prompts)
             
-            # Nghỉ 45 giây sau mỗi batch trừ batch cuối
+            # Nghỉ 15 giây sau mỗi batch trừ batch cuối
             if i + batch_size_gemini < len(story_data['paragraphs']):
-                print("Waiting 45 seconds before next batch of prompts...")
-                await asyncio.sleep(45)
+                print("Waiting 15 seconds before next batch of prompts...")
+                await asyncio.sleep(15)
 
         # Nếu chỉ tạo prompt, không gọi API tạo ảnh
         if image_mode == 'prompt':
