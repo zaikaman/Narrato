@@ -521,8 +521,8 @@ async def generate_story():
     print("\n=== Bắt đầu generate_story endpoint ===")
     prompt = request.form.get('prompt')
     image_mode = request.form.get('imageMode', 'generate')  # Mặc định là tạo ảnh
-    min_paragraphs = int(request.form.get('minParagraphs', 30))  # Mặc định là 30
-    max_paragraphs = int(request.form.get('maxParagraphs', 50))  # Mặc định là 50
+    min_paragraphs = int(request.form.get('minParagraphs', 15))  # Mặc định là 15
+    max_paragraphs = int(request.form.get('maxParagraphs', 20))  # Mặc định là 20
     print(f"Received prompt: {prompt}")
     print(f"Image mode: {image_mode}")
     print(f"Paragraph range: {min_paragraphs}-{max_paragraphs}")
