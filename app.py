@@ -181,6 +181,30 @@ def generate_voice(text, voice_id="pNInz6obpgDQGcFmaJgB"):
         print(f"Lỗi khi tạo giọng đọc: {str(e)}")
         return None
 
+def check_paragraph_length(paragraph):
+    """Kiểm tra và điều chỉnh độ dài đoạn văn để không vượt quá 30 từ"""
+    words = paragraph.split()
+    if len(words) > 30:
+        # Cắt đoạn văn thành các phần nhỏ hơn 30 từ
+        new_paragraphs = []
+        current_paragraph = []
+        word_count = 0
+        
+        for word in words:
+            if word_count + 1 > 30:
+                new_paragraphs.append(' '.join(current_paragraph))
+                current_paragraph = [word]
+                word_count = 1
+            else:
+                current_paragraph.append(word)
+                word_count += 1
+                
+        if current_paragraph:
+            new_paragraphs.append(' '.join(current_paragraph))
+            
+        return new_paragraphs
+    return [paragraph]
+
 async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
     """Tạo nội dung câu chuyện bằng Gemini"""
     try:
@@ -200,15 +224,16 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
 
         IMPORTANT WRITING GUIDELINES:
         1. Write detailed, descriptive paragraphs that paint a clear picture
-        2. Each paragraph should be 3-5 sentences long and focus on one scene or moment
-        3. Use sensory details to bring scenes to life (sights, sounds, smells, textures, etc.)
-        4. Balance dialogue, action, and description
-        5. Include character emotions and internal thoughts
-        6. Use simple but expressive language that everyone can understand
-        7. Create smooth transitions between paragraphs
-        8. Maintain a steady pace - don't rush through important moments
-        9. Show character development through actions and reactions
-        10. Build tension and emotional investment throughout the story
+        2. Each paragraph MUST BE 30 WORDS OR LESS
+        3. Each paragraph should focus on one scene or moment
+        4. Use sensory details to bring scenes to life (sights, sounds, smells, textures, etc.)
+        5. Balance dialogue, action, and description
+        6. Include character emotions and internal thoughts
+        7. Use simple but expressive language that everyone can understand
+        8. Create smooth transitions between paragraphs
+        9. Maintain a steady pace - don't rush through important moments
+        10. Show character development through actions and reactions
+        11. Build tension and emotional investment throughout the story
 
         PARAGRAPH STRUCTURE:
         - Start with scene-setting details
@@ -216,13 +241,14 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         - Include relevant dialogue or internal thoughts
         - End with a hook to the next paragraph
         - Each paragraph should be a mini-scene that moves the story forward
+        - STRICTLY KEEP EACH PARAGRAPH UNDER 30 WORDS
 
         Return the story in this EXACT JSON format, with NO additional text or formatting:
         {{
             "title": "Story Title",
             "paragraphs": [
-                "First detailed paragraph text (3-5 sentences)",
-                "Second detailed paragraph text (3-5 sentences)",
+                "First detailed paragraph text (under 30 words)",
+                "Second detailed paragraph text (under 30 words)",
                 ... (between {min_paragraphs}-{max_paragraphs} paragraphs)
             ],
             "moral": "The moral lesson from the story"
@@ -230,12 +256,12 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
 
         IMPORTANT FORMAT RULES:
         - Do NOT add trailing commas after the last item in arrays or objects
-        - Each paragraph must be 3-5 sentences long with rich details
+        - Each paragraph must be under 30 words with rich details
         - Story should match the theme: {prompt}
         - Return ONLY the JSON object, no other text
         - Number of paragraphs should be between {min_paragraphs} and {max_paragraphs}
         - The story should feel complete, don't force it to exactly {max_paragraphs} paragraphs
-        - Focus on quality and detail in each paragraph
+        - Focus on quality and detail in each paragraph while keeping them concise
         """)
         
         print("Đã nhận response từ Gemini")
@@ -265,7 +291,15 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
             if not all(key in story_data for key in ['title', 'paragraphs', 'moral']):
                 raise ValueError("Missing required fields in story data")
             
-            # Đảm bảo số lượng đoạn văn nằm trong khoảng 30-50
+            # Kiểm tra và điều chỉnh độ dài của mỗi đoạn văn
+            adjusted_paragraphs = []
+            for paragraph in story_data['paragraphs']:
+                split_paragraphs = check_paragraph_length(paragraph)
+                adjusted_paragraphs.extend(split_paragraphs)
+            
+            story_data['paragraphs'] = adjusted_paragraphs
+            
+            # Đảm bảo số lượng đoạn văn nằm trong khoảng min-max
             num_paragraphs = len(story_data['paragraphs'])
             if num_paragraphs > max_paragraphs:
                 print(f"Trimming paragraphs from {num_paragraphs} to {max_paragraphs}")
