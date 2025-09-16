@@ -47,6 +47,28 @@ def shov_contents():
     response = requests.post(f"{SHOV_API_URL}/contents/{PROJECT_NAME}", headers=headers)
     return response.json()
 
+def shov_add(collection_name, value):
+    """Add a JSON object to a collection."""
+    headers = {
+        "Authorization": f"Bearer {SHOV_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {"name": collection_name, "value": value}
+    response = requests.post(f"{SHOV_API_URL}/add/{PROJECT_NAME}", headers=headers, json=data)
+    return response.json()
+
+def shov_where(collection_name, filter_dict=None):
+    """Filter items in a collection based on JSON properties."""
+    headers = {
+        "Authorization": f"Bearer {SHOV_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {"name": collection_name}
+    if filter_dict:
+        data['filter'] = filter_dict
+    response = requests.post(f"{SHOV_API_URL}/where/{PROJECT_NAME}", headers=headers, json=data)
+    return response.json()
+
 def shov_send_otp(email):
     """Send OTP to the user's email."""
     headers = {
@@ -626,10 +648,12 @@ async def list_stories():
 @app.route('/stories/<title>')
 async def get_story(title):
     """Get a story from the database"""
-    story = shov_get(title)
-    if story:
-        return jsonify(story)
-    return jsonify({"error": "Story not found"}), 404
+    story_response = shov_where('stories', {'title': title})
+    stories = story_response.get('items', [])
+    if stories:
+        story = stories[0]['value']
+        return await sync_to_async(render_template)('story_view.html', story=story)
+    return "Story not found", 404
 
 @app.route('/login', methods=['GET', 'POST'])
 async def login():
@@ -657,6 +681,15 @@ async def verify():
 async def logout():
     session.pop('email', None)
     return redirect(url_for('index'))
+
+
+@app.route('/history')
+@login_required
+async def story_history():
+    """Display user's story history"""
+    stories_response = shov_where('stories', {'email': session['email']})
+    user_stories = stories_response.get('items', [])
+    return await sync_to_async(render_template)('history.html', stories=user_stories)
 
 
 @app.route('/generate_story', methods=['POST'])
@@ -800,8 +833,11 @@ async def generate_story():
         # Do not use ElevenLabs due to free tier limitations
         story_data['audio_files'] = []
         
-        # Save the story to the shov.com database
-        shov_set(story_data['title'], story_data)
+        # Add user email to story data
+        story_data['email'] = session['email']
+        
+        # Save the story to the "stories" collection
+        shov_add('stories', story_data)
         
         print("=== Finished generate_story endpoint successfully ===\n")
         return jsonify(story_data)

@@ -16,8 +16,14 @@
                 <img src="/static/images/logo.png" alt="Logo" class="h-16">
                 <img src="/static/images/logo-text.png" alt="Logo Text" class="h-12 ml-4">
             </div>
-            <div>
+            <div class="flex items-center">
                 {% if session['email'] %}
+                    <div class="dropdown">
+                        <button class="pixel-button">Account</button>
+                        <div class="dropdown-content">
+                            <a href="{{ url_for('story_history') }}">Story History</a>
+                        </div>
+                    </div>
                     <a href="{{ url_for('logout') }}" class="ml-4 pixel-button logout-button">Logout</a>
                 {% else %}
                     <a href="{{ url_for('login') }}" class="pixel-button">Login</a>
