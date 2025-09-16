@@ -1,4 +1,6 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from functools import wraps
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, flash
+
 from dotenv import load_dotenv
 import os
 import google.generativeai as genai
@@ -10,6 +12,61 @@ import asyncio
 from asgiref.sync import sync_to_async
 import re
 import traceback
+import requests
+
+# Shov.com configuration
+SHOV_API_KEY = os.getenv("SHOV_API_KEY")
+PROJECT_NAME = os.getenv("SHOV_PROJECT", "narrato")
+SHOV_API_URL = f"https://shov.com/api"
+
+def shov_set(key, value):
+    """Store a key-value pair in the shov.com database."""
+    headers = {
+        "Authorization": f"Bearer {SHOV_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {"key": key, "value": value}
+    response = requests.post(f"{SHOV_API_URL}/set/{PROJECT_NAME}", headers=headers, json=data)
+    return response.json()
+
+def shov_get(key):
+    """Retrieve a key-value pair from the shov.com database."""
+    headers = {
+        "Authorization": f"Bearer {SHOV_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {"key": key}
+    response = requests.post(f"{SHOV_API_URL}/get/{PROJECT_NAME}", headers=headers, json=data)
+    return response.json()
+
+def shov_contents():
+    """List all items in the shov.com project."""
+    headers = {
+        "Authorization": f"Bearer {SHOV_API_KEY}",
+    }
+    response = requests.post(f"{SHOV_API_URL}/contents/{PROJECT_NAME}", headers=headers)
+    return response.json()
+
+def shov_send_otp(email):
+    """Send OTP to the user's email."""
+    headers = {
+        "Authorization": f"Bearer {SHOV_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {"identifier": email}
+    response = requests.post(f"{SHOV_API_URL}/send-otp/{PROJECT_NAME}", headers=headers, json=data)
+    print(f"shov_send_otp response: {response.json()}")
+    return response.json()
+
+def shov_verify_otp(email, pin):
+    """Verify the OTP provided by the user."""
+    headers = {
+        "Authorization": f"Bearer {SHOV_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {"identifier": email, "pin": pin}
+    response = requests.post(f"{SHOV_API_URL}/verify-otp/{PROJECT_NAME}", headers=headers, json=data)
+    return response.json()
 
 class APIKeyManager:
     """Manages and rotates API keys"""
@@ -47,7 +104,21 @@ class APIKeyManager:
 api_key_manager = APIKeyManager()
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
 load_dotenv()
+
+print(f"SHOV_API_KEY: {os.getenv('SHOV_API_KEY')}")
+print(f"SHOV_PROJECT: {os.getenv('SHOV_PROJECT')}")
+
+
+def login_required(f):
+    @wraps(f)
+    async def decorated_function(*args, **kwargs):
+        if 'email' not in session:
+            return redirect(url_for('login', next=request.url))
+        return await f(*args, **kwargs)
+    return decorated_function
+
 
 # Configure API keys
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -271,7 +342,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
         
         # Remove trailing comma after the last element of the array and object
-        response_text = re.sub(r',(\s*[\\\]}])', r'\1', response_text)
+        response_text = re.sub(r',(\s*[\\\\\]}})', r'\1', response_text)
         response_text = re.sub(r',\s*"moral":', r',"moral":', response_text)
         
         # Remove extra whitespace and reformat JSON
@@ -423,7 +494,7 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
         if previous_prompts:
             prompt_history_context = f"""
             Previous image prompts for consistency (numbered in sequence):
-            {chr(10).join(f"{i+1}. {prompt}" for i, prompt in enumerate(previous_prompts))}
+            {chr(10).join(f'{i+1}. {prompt}' for i, prompt in enumerate(previous_prompts))}
             """
 
         # Analyze the paragraph to identify which characters appear
@@ -547,7 +618,49 @@ async def serve_audio(filename):
         print(f"Error serving audio file: {str(e)}")
         return jsonify({"error": "Could not play audio file"}), 404
 
+@app.route('/stories')
+async def list_stories():
+    """List all stories in the database"""
+    return jsonify(shov_contents())
+
+@app.route('/stories/<title>')
+async def get_story(title):
+    """Get a story from the database"""
+    story = shov_get(title)
+    if story:
+        return jsonify(story)
+    return jsonify({"error": "Story not found"}), 404
+
+@app.route('/login', methods=['GET', 'POST'])
+async def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        shov_send_otp(email)
+        return redirect(url_for('verify', email=email))
+    return await sync_to_async(render_template)('login.html')
+
+@app.route('/verify', methods=['GET', 'POST'])
+async def verify():
+    email = request.args.get('email')
+    if request.method == 'POST':
+        pin = request.form['pin']
+        response = shov_verify_otp(email, pin)
+        if response.get('success'):
+            session['email'] = email
+            return redirect(url_for('index'))
+        else:
+            flash("Invalid OTP. Please try again.")
+            return redirect(url_for('verify', email=email))
+    return await sync_to_async(render_template)('verify.html', email=email)
+
+@app.route('/logout')
+async def logout():
+    session.pop('email', None)
+    return redirect(url_for('index'))
+
+
 @app.route('/generate_story', methods=['POST'])
+@login_required
 async def generate_story():
     print("\n=== Starting generate_story endpoint ===")
     prompt = request.form.get('prompt')
@@ -687,6 +800,9 @@ async def generate_story():
         # Do not use ElevenLabs due to free tier limitations
         story_data['audio_files'] = []
         
+        # Save the story to the shov.com database
+        shov_set(story_data['title'], story_data)
+        
         print("=== Finished generate_story endpoint successfully ===\n")
         return jsonify(story_data)
         
@@ -698,4 +814,3 @@ async def generate_story():
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
- 
