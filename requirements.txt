@@ -4,14 +4,7 @@ google-generativeai
 python-dotenv
 elevenlabs
 Pillow
-moviepy
 requests
 python-multipart
 fal-client
-numpy
-decorator
-proglog
-tqdm
-imageio
-imageio-ffmpeg
-aiohttp 
+aiohttp
