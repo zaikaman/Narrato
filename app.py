@@ -12,7 +12,7 @@ import re
 import traceback
 
 class APIKeyManager:
-    """Quản lý và luân phiên sử dụng các API key"""
+    """Manages and rotates API keys"""
     def __init__(self):
         self.google_keys = [
             os.getenv('GOOGLE_API_KEY'),
@@ -25,7 +25,7 @@ class APIKeyManager:
         self._lock = asyncio.Lock()
     
     async def get_next_key(self):
-        """Lấy API key tiếp theo theo round-robin"""
+        """Gets the next API key in a round-robin fashion"""
         async with self._lock:
             self.current_key_index = (self.current_key_index + 1) % len(self.google_keys)
             key = self.google_keys[self.current_key_index]
@@ -33,23 +33,23 @@ class APIKeyManager:
             return key
     
     def get_current_key(self):
-        """Lấy API key hiện tại"""
+        """Gets the current API key"""
         return self.google_keys[self.current_key_index]
     
     async def get_least_used_key(self):
-        """Lấy API key được sử dụng ít nhất"""
+        """Gets the least-used API key"""
         async with self._lock:
             key = min(self.key_usage.items(), key=lambda x: x[1])[0]
             self.key_usage[key] += 1
             return key
 
-# Khởi tạo API key manager
+# Initialize API key manager
 api_key_manager = APIKeyManager()
 
 app = Flask(__name__)
 load_dotenv()
 
-# Cấu hình API keys
+# Configure API keys
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 FAL_KEY = os.getenv('FAL_KEY')
@@ -59,24 +59,24 @@ elevenlabs_client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 os.environ["FAL_KEY"] = FAL_KEY
 
 async def generate_image(prompt):
-    """Tạo hình ảnh từ prompt sử dụng FAL.ai"""
+    """Generate image from prompt using FAL.ai"""
     try:
-        print(f"\n=== Bắt đầu generate_image ===")
+        print(f"\n=== Starting generate_image ===")
         print(f"Input prompt: {prompt}")
         
-        # Đảm bảo prompt là string và không quá dài
+        # Make sure the prompt is a string and not too long
         if isinstance(prompt, dict):
             prompt = str(prompt)
         
-        # Giới hạn độ dài prompt và làm sạch
+        # Limit prompt length and clean it up
         prompt = prompt[:500]
         prompt = re.sub(r'["\'\n]', '', prompt)
         
-        # Thêm style vào prompt
+        # Add style to prompt
         enhanced_prompt = f"{prompt}, digital art style, high quality, detailed, vibrant colors"
         print(f"Enhanced prompt: {enhanced_prompt}")
 
-        # Tạo request
+        # Create request
         request_data = {
             "prompt": enhanced_prompt,
             "image_size": "landscape_16_9",
@@ -119,28 +119,28 @@ async def generate_image(prompt):
                 return None
                 
             print(f"Image generated successfully: {image_url}")
-            print("=== Kết thúc generate_image ===\n")
+            print("=== Finished generate_image ===\n")
             return image_url
             
         print(f"Invalid result format: {result}")
-        print("=== Kết thúc generate_image với lỗi ===\n")
+        print("=== Finished generate_image with error ===\n")
         return None
         
     except Exception as e:
-        print(f"Lỗi khi tạo hình ảnh: {str(e)}")
+        print(f"Error creating image: {str(e)}")
         print(f"Stack trace: {traceback.format_exc()}")
-        print("=== Kết thúc generate_image với exception ===\n")
+        print("=== Finished generate_image with exception ===\n")
         return None
 
 def find_character(name, char_db):
-    """Tìm thông tin nhân vật trong database
+    """Find character information in the database
     
     Args:
-        name (str): Tên nhân vật cần tìm
-        char_db (dict): Database chứa thông tin nhân vật
+        name (str): Character name to search for
+        char_db (dict): Database containing character information
         
     Returns:
-        tuple: (character_data, character_type) hoặc (None, None) nếu không tìm thấy
+        tuple: (character_data, character_type) or (None, None) if not found
     """
     for char in char_db.get('main_characters', []):
         if char['name'].lower() == name.lower():
@@ -155,19 +155,19 @@ def find_character(name, char_db):
 
 @sync_to_async
 def generate_voice(text, voice_id="pNInz6obpgDQGcFmaJgB"):
-    """Tạo giọng đọc từ văn bản sử dụng ElevenLabs"""
+    """Generate voice from text using ElevenLabs"""
     try:
-        # Tạo audio stream từ text
+        # Create audio stream from text
         audio_stream = elevenlabs_client.text_to_speech.convert_as_stream(
             text=text,
             voice_id=voice_id,
             model_id="eleven_multilingual_v2"
         )
         
-        # Lưu audio stream vào file tạm thời
+        # Save audio stream to a temporary file
         temp_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
         
-        # Ghi từng chunk vào file
+        # Write each chunk to the file
         for chunk in audio_stream:
             if isinstance(chunk, bytes):
                 temp_file.write(chunk)
@@ -175,14 +175,14 @@ def generate_voice(text, voice_id="pNInz6obpgDQGcFmaJgB"):
         temp_file.close()
         return temp_file.name
     except Exception as e:
-        print(f"Lỗi khi tạo giọng đọc: {str(e)}")
+        print(f"Error creating voice: {str(e)}")
         return None
 
 def check_paragraph_length(paragraph):
-    """Kiểm tra và điều chỉnh độ dài đoạn văn để không vượt quá 30 từ"""
+    """Check and adjust paragraph length to not exceed 30 words"""
     words = paragraph.split()
     if len(words) > 30:
-        # Cắt đoạn văn thành các phần nhỏ hơn 30 từ
+        # Cut the paragraph into smaller parts of less than 30 words
         new_paragraphs = []
         current_paragraph = []
         word_count = 0
@@ -203,18 +203,18 @@ def check_paragraph_length(paragraph):
     return [paragraph]
 
 async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
-    """Tạo nội dung câu chuyện bằng Gemini"""
+    """Generate story content using Gemini"""
     try:
-        print(f"\n=== Bắt đầu generate_story_content ===")
+        print(f"\n=== Starting generate_story_content ===")
         print(f"Input prompt: {prompt}")
         
-        # Lấy API key ít được sử dụng nhất
+        # Get the least used API key
         api_key = await api_key_manager.get_least_used_key()
         genai.configure(api_key=api_key)
-        print("Đã khởi tạo model Gemini với API key mới")
+        print("Initialized Gemini model with new API key")
         
         model = genai.GenerativeModel('gemini-2.0-flash')
-        print("Gửi yêu cầu tạo câu chuyện...")
+        print("Sending story creation request...")
         english_story_response = model.generate_content(f"""
         You are a master storyteller writing an engaging and detailed story for a general audience. 
         Create a rich, vivid story based on this theme: {prompt}
@@ -261,34 +261,34 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         - Focus on quality and detail in each paragraph while keeping them concise
         """)
         
-        print("Đã nhận response từ Gemini")
+        print("Received response from Gemini")
         
-        # Lấy text response và làm sạch
+        # Get text response and clean it up
         response_text = english_story_response.text.strip()
         print(f"Raw response: {response_text}")
         
-        # Loại bỏ markdown code blocks
+        # Remove markdown code blocks
         response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
         
-        # Loại bỏ dấu phẩy thừa sau phần tử cuối của mảng và object
-        response_text = re.sub(r',(\s*[\]}])', r'\1', response_text)
+        # Remove trailing comma after the last element of the array and object
+        response_text = re.sub(r',(\s*[\\\]}])', r'\1', response_text)
         response_text = re.sub(r',\s*"moral":', r',"moral":', response_text)
         
-        # Loại bỏ khoảng trắng thừa và format lại JSON
+        # Remove extra whitespace and reformat JSON
         response_text = re.sub(r'\s+', ' ', response_text)
         print(f"Cleaned response: {response_text}")
         
         try:
-            # Thử parse JSON
+            # Try parsing JSON
             print("Parsing JSON...")
             story_data = json.loads(response_text)
             print("JSON parsed successfully")
             
-            # Kiểm tra cấu trúc JSON
+            # Check JSON structure
             if not all(key in story_data for key in ['title', 'paragraphs', 'moral']):
                 raise ValueError("Missing required fields in story data")
             
-            # Kiểm tra và điều chỉnh độ dài của mỗi đoạn văn
+            # Check and adjust the length of each paragraph
             adjusted_paragraphs = []
             for paragraph in story_data['paragraphs']:
                 split_paragraphs = check_paragraph_length(paragraph)
@@ -296,7 +296,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
             
             story_data['paragraphs'] = adjusted_paragraphs
             
-            # Đảm bảo số lượng đoạn văn nằm trong khoảng min-max
+            # Make sure the number of paragraphs is within the min-max range
             num_paragraphs = len(story_data['paragraphs'])
             if num_paragraphs > max_paragraphs:
                 print(f"Trimming paragraphs from {num_paragraphs} to {max_paragraphs}")
@@ -307,12 +307,12 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
                     story_data['paragraphs'].append("And the story continues...")
             
             print(f"Final number of paragraphs: {len(story_data['paragraphs'])}")
-            print("=== Kết thúc generate_story_content thành công ===\n")
+            print("=== Finished generate_story_content successfully ===\n")
             return story_data
                 
         except (json.JSONDecodeError, ValueError) as e:
             print(f"Error processing story: {str(e)}")
-            print("=== Kết thúc generate_story_content với lỗi parsing ===\n")
+            print("=== Finished generate_story_content with parsing error ===\n")
             return {
                 "title": "Error Creating Story",
                 "paragraphs": ["We encountered an error while creating your story."] * min_paragraphs,
@@ -321,11 +321,11 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
     except Exception as e:
         print(f"Generate story error: {str(e)}")
         print(f"Stack trace: {traceback.format_exc()}")
-        print("=== Kết thúc generate_story_content với exception ===\n")
+        print("=== Finished generate_story_content with exception ===\n")
         raise
 
 async def analyze_story_characters(story_data):
-    """Phân tích và tạo mô tả nhất quán cho tất cả nhân vật trong câu chuyện"""
+    """Analyze and create consistent descriptions for all characters in the story"""
     try:
         model = genai.GenerativeModel('gemini-2.0-flash')
         
@@ -391,7 +391,7 @@ async def analyze_story_characters(story_data):
             if not (char_data.get('main_characters') or char_data.get('supporting_characters')):
                 raise ValueError("Missing character data in response")
                 
-            # Thêm vào story_data
+            # Add to story_data
             story_data['character_database'] = char_data
             print("Successfully created character database")
             return char_data
@@ -406,19 +406,19 @@ async def analyze_story_characters(story_data):
         return None
 
 async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, previous_prompts=None):
-    """Tạo prompt cho hình ảnh bằng Gemini, với thông tin về nhân vật để giữ tính nhất quán"""
+    """Create a prompt for the image using Gemini, with character information to keep it consistent"""
     try:
-        # Lấy API key tiếp theo theo round-robin
+        # Get the next API key in a round-robin fashion
         api_key = await api_key_manager.get_next_key()
         genai.configure(api_key=api_key)
-        print(f"Sử dụng API key mới cho generate_image_prompt")
+        print(f"Using new API key for generate_image_prompt")
         
         model = genai.GenerativeModel('gemini-2.0-flash')
         
-        # Lấy lịch sử prompts từ story_data
+        # Get prompt history from story_data
         previous_prompts = story_data.get('previous_prompts', []) if story_data else []
         
-        # Tạo context từ lịch sử prompts
+        # Create context from prompt history
         prompt_history_context = ""
         if previous_prompts:
             prompt_history_context = f"""
@@ -426,7 +426,7 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
             {chr(10).join(f"{i+1}. {prompt}" for i, prompt in enumerate(previous_prompts))}
             """
 
-        # Phân tích đoạn văn để xác định nhân vật xuất hiện
+        # Analyze the paragraph to identify which characters appear
         character_mention_analysis = model.generate_content(f"""
         Analyze this paragraph and identify which characters appear in it.
         Also identify their emotional state or any significant changes in appearance.
@@ -451,11 +451,11 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
         except:
             mentioned_chars = []
 
-        # Lấy thông tin nhân vật từ character_database
+        # Get character information from the character_database
         character_descriptions = []
         char_db = story_data.get('character_database', {})
         
-        # Xây dựng mô tả nhân vật dựa trên trạng thái cảm xúc và thay đổi
+        # Build a character description based on emotional state and changes
         for mention in mentioned_chars:
             char_name = mention.get('name')
             char_data, char_type = find_character(char_name, char_db)
@@ -463,13 +463,13 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
             if char_data:
                 description = char_data.get('base_description', '')
                 
-                # Thêm biểu cảm dựa trên trạng thái cảm xúc
+                # Add an expression based on the emotional state
                 emotions = mention.get('emotional_state', [])
                 for variation in char_data.get('variations', []):
                     if any(emotion in variation['trigger_keywords'] for emotion in emotions):
                         description = f"{description}, {variation['expression_override']}"
                 
-                # Thêm thay đổi ngoại hình nếu có
+                # Add appearance changes if any
                 appearance_change = mention.get('appearance_change')
                 if appearance_change:
                     for dev_point in char_data.get('development_points', []):
@@ -495,7 +495,7 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
             - Perspective: {art_style.get('perspective', '')}
             """
             
-        # Tạo prompt với mô tả nhân vật đầy đủ và lịch sử prompts
+        # Create a prompt with the full character description and prompt history
         image_prompt_response = model.generate_content(f"""
         You are a visual artist creating prompts for an AI image generator.
         Create a detailed image generation prompt for this story paragraph while maintaining STRICT character and style consistency.
@@ -523,10 +523,10 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
         """)
         
         prompt = image_prompt_response.text.strip()
-        # Loại bỏ dấu ngoặc kép và ký tự đặc biệt
+        # Remove quotes and special characters
         prompt = re.sub(r'["\'\n]', '', prompt)
         
-        # Lưu prompt vào lịch sử
+        # Save prompt to history
         if story_data and 'previous_prompts' in story_data:
             story_data['previous_prompts'].append(prompt)
         
@@ -544,32 +544,32 @@ async def serve_audio(filename):
     try:
         return await sync_to_async(send_file)(filename, mimetype='audio/mpeg')
     except Exception as e:
-        print(f"Lỗi khi phục vụ file audio: {str(e)}")
-        return jsonify({"error": "Không thể phát file âm thanh"}), 404
+        print(f"Error serving audio file: {str(e)}")
+        return jsonify({"error": "Could not play audio file"}), 404
 
 @app.route('/generate_story', methods=['POST'])
 async def generate_story():
-    print("\n=== Bắt đầu generate_story endpoint ===")
+    print("\n=== Starting generate_story endpoint ===")
     prompt = request.form.get('prompt')
-    image_mode = request.form.get('imageMode', 'generate')  # Mặc định là tạo ảnh
-    min_paragraphs = int(request.form.get('minParagraphs', 15))  # Mặc định là 15
-    max_paragraphs = int(request.form.get('maxParagraphs', 20))  # Mặc định là 20
+    image_mode = request.form.get('imageMode', 'generate')  # Default is to generate images
+    min_paragraphs = int(request.form.get('minParagraphs', 15))  # Default is 15
+    max_paragraphs = int(request.form.get('maxParagraphs', 20))  # Default is 20
     print(f"Received prompt: {prompt}")
     print(f"Image mode: {image_mode}")
     print(f"Paragraph range: {min_paragraphs}-{max_paragraphs}")
     
     try:
-        # Tạo nội dung câu chuyện
+        # Generate story content
         print("Generating story content...")
         story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
-        story_data['previous_prompts'] = []  # Khởi tạo list lưu lịch sử prompts
+        story_data['previous_prompts'] = []  # Initialize a list to save the prompt history
         print("Story content generated successfully")
 
-        # Tạo style guide
+        # Create style guide
         print("Generating style guide...")
         api_key = await api_key_manager.get_next_key()
         genai.configure(api_key=api_key)
-        print("Sử dụng API key mới cho style guide")
+        print("Using new API key for style guide")
         
         model = genai.GenerativeModel('gemini-2.0-flash')
         style_guide = model.generate_content(f"""
@@ -611,7 +611,7 @@ async def generate_story():
                 }
             }
 
-        # Phân tích và tạo cơ sở dữ liệu nhân vật
+        # Analyze and create character database
         print("Analyzing characters...")
         char_data = await analyze_story_characters(story_data)
         if not char_data:
@@ -622,16 +622,16 @@ async def generate_story():
                 "groups": []
             }
         
-        # Tạo prompts cho hình ảnh theo batch để tránh rate limit
+        # Generate image prompts in batches to avoid rate limits
         print("Generating image prompts...")
         image_prompts = []
-        batch_size_gemini = 5  # Số lượng prompt tạo trước khi nghỉ
+        batch_size_gemini = 5  # Number of prompts to create before resting
         
         for i in range(0, len(story_data['paragraphs']), batch_size_gemini):
             batch_paragraphs = story_data['paragraphs'][i:i + batch_size_gemini]
-            print(f"\nProcessing prompt batch {i//batch_size_gemini + 1}/{len(story_data['paragraphs'])//batch_size_gemini + 1}...")
+            print("\nProcessing prompt batch {}/{}...".format(i // batch_size_gemini + 1, len(story_data['paragraphs']) // batch_size_gemini + 1))
             
-            # Tạo prompt cho batch hiện tại
+            # Create prompts for the current batch
             batch_prompts = []
             for j, paragraph in enumerate(batch_paragraphs):
                 print(f"Generating prompt for paragraph {i + j + 1}...")
@@ -641,29 +641,29 @@ async def generate_story():
             
             image_prompts.extend(batch_prompts)
             
-            # Nghỉ 15 giây sau mỗi batch trừ batch cuối
+            # Rest for 15 seconds after each batch except for the last one
             if i + batch_size_gemini < len(story_data['paragraphs']):
                 print("Waiting 15 seconds before next batch of prompts...")
                 await asyncio.sleep(15)
 
-        # Nếu chỉ tạo prompt, không gọi API tạo ảnh
+        # If only creating prompts, don't call the image creation API
         if image_mode == 'prompt':
             print("Prompt-only mode, skipping image generation")
             image_data = [{'prompt': prompt, 'url': None} for prompt in image_prompts]
         else:
-            # Tạo hình ảnh song song, chia thành các nhóm nhỏ để tránh quá tải
+            # Create images in parallel, divided into small groups to avoid overloading
             print("\nGenerating images...")
-            batch_size_fal = 5  # Số lượng ảnh tạo đồng thời
+            batch_size_fal = 5  # Number of images to create at the same time
             image_data = []
             
             for i in range(0, len(image_prompts), batch_size_fal):
                 batch_prompts = image_prompts[i:i + batch_size_fal]
-                print(f"\nProcessing image batch {i//batch_size_fal + 1}/{len(image_prompts)//batch_size_fal + 1}...")
+                print("\nProcessing image batch {}/{}...".format(i // batch_size_fal + 1, len(image_prompts) // batch_size_fal + 1))
                 
                 batch_tasks = [generate_image(prompt) for prompt in batch_prompts]
                 batch_results = await asyncio.gather(*batch_tasks)
                 
-                # Lọc bỏ các URL None và lưu cả prompt
+                # Filter out None URLs and save the prompt as well
                 batch_data = []
                 for url, prompt in zip(batch_results, batch_prompts):
                     if url is not None:
@@ -675,26 +675,27 @@ async def generate_story():
                 
                 print(f"Batch {i//batch_size_fal + 1} completed: {len(batch_data)} images generated")
                 
-                # Đợi một chút giữa các batch để tránh quá tải API
+                # Wait a moment between batches to avoid API overload
                 if i + batch_size_fal < len(image_prompts):
                     await asyncio.sleep(2)
             
             print(f"Total images generated: {len(image_data)}")
         
-        # Thêm URLs hình ảnh và prompts vào response
+        # Add image URLs and prompts to the response
         story_data['images'] = image_data
         
-        # Không sử dụng ElevenLabs do giới hạn free tier
+        # Do not use ElevenLabs due to free tier limitations
         story_data['audio_files'] = []
         
-        print("=== Kết thúc generate_story endpoint thành công ===\n")
+        print("=== Finished generate_story endpoint successfully ===\n")
         return jsonify(story_data)
         
     except Exception as e:
         print(f"Error in generate_story endpoint: {str(e)}")
         print(f"Stack trace: {traceback.format_exc()}")
-        print("=== Kết thúc generate_story endpoint với lỗi ===\n")
+        print("=== Finished generate_story endpoint with error ===\n")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8080, debug=True) 
+    app.run(host='127.0.0.1', port=8080, debug=True)
+ 

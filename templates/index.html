@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -44,47 +44,47 @@
         <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
             <form id="storyForm" class="space-y-4">
                 <div>
-                    <label for="prompt" class="block text-sm font-medium text-gray-700">Chủ đề câu chuyện</label>
+                    <label for="prompt" class="block text-sm font-medium text-gray-700">Story theme</label>
                     <input type="text" id="prompt" name="prompt" 
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                           placeholder="Nhập chủ đề bạn muốn tạo câu chuyện...">
+                           placeholder="Enter the theme you want to create a story about...">
                 </div>
 
                 <div class="grid grid-cols-1 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Số lượng đoạn văn</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Number of paragraphs</label>
                         <div class="flex space-x-4">
                             <div class="flex-1">
-                                <label for="minParagraphs" class="block text-xs text-gray-500">Tối thiểu</label>
+                                <label for="minParagraphs" class="block text-xs text-gray-500">Minimum</label>
                                 <input type="number" id="minParagraphs" name="minParagraphs" 
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                        value="30" min="5" max="100">
                             </div>
                             <div class="flex-1">
-                                <label for="maxParagraphs" class="block text-xs text-gray-500">Tối đa</label>
+                                <label for="maxParagraphs" class="block text-xs text-gray-500">Maximum</label>
                                 <input type="number" id="maxParagraphs" name="maxParagraphs" 
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                        value="40" min="5" max="100">
                             </div>
                         </div>
-                        <p class="mt-1 text-xs text-gray-500">Mỗi đoạn văn sẽ có một hình ảnh minh họa tương ứng</p>
+                        <p class="mt-1 text-xs text-gray-500">Each paragraph will have a corresponding illustration</p>
                     </div>
 
                     <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700">Chế độ tạo hình ảnh</label>
+                        <label class="block text-sm font-medium text-gray-700">Image generation mode</label>
                         <div class="space-y-2">
                             <div class="flex items-center">
                                 <input type="radio" id="generateImages" name="imageMode" value="generate" checked
                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
                                 <label for="generateImages" class="ml-2 block text-sm text-gray-700">
-                                    Tạo hình ảnh trực tiếp
+                                    Generate images directly
                                 </label>
                             </div>
                             <div class="flex items-center">
                                 <input type="radio" id="promptOnly" name="imageMode" value="prompt"
                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
                                 <label for="promptOnly" class="ml-2 block text-sm text-gray-700">
-                                    Chỉ tạo prompt (không tạo hình ảnh)
+                                    Only generate prompts (no images)
                                 </label>
                             </div>
                         </div>
@@ -93,7 +93,7 @@
 
                 <button type="submit" 
                         class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    Tạo câu chuyện
+                    Create story
                 </button>
             </form>
 
@@ -104,7 +104,7 @@
                     </div>
                     
                     <div class="space-y-2">
-                        <div class="text-center text-gray-600" id="currentTask">Đang tạo câu chuyện...</div>
+                        <div class="text-center text-gray-600" id="currentTask">Creating story...</div>
                         
                         <div class="relative pt-1">
                             <div class="flex mb-2 items-center justify-between">
@@ -122,15 +122,15 @@
                         <div id="taskList" class="space-y-1 text-sm text-gray-600">
                             <div id="task1" class="flex items-center">
                                 <i class="fas fa-circle text-xs mr-2"></i>
-                                <span>Tạo nội dung câu chuyện</span>
+                                <span>Create story content</span>
                             </div>
                             <div id="task2" class="flex items-center">
                                 <i class="fas fa-circle text-xs mr-2"></i>
-                                <span>Tạo prompt cho hình ảnh</span>
+                                <span>Create prompts for images</span>
                             </div>
                             <div id="task3" class="flex items-center">
                                 <i class="fas fa-circle text-xs mr-2"></i>
-                                <span>Tạo hình ảnh minh họa</span>
+                                <span>Create illustrations</span>
                             </div>
                         </div>
                     </div>
@@ -142,10 +142,10 @@
                 
                 <div class="flex justify-center space-x-4 mb-4">
                     <button id="playAll" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
-                        <i class="fas fa-play mr-2"></i>Phát toàn bộ
+                        <i class="fas fa-play mr-2"></i>Play all
                     </button>
                     <button id="pauseAll" class="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 hidden">
-                        <i class="fas fa-pause mr-2"></i>Tạm dừng
+                        <i class="fas fa-pause mr-2"></i>Pause
                     </button>
                 </div>
                 
@@ -154,7 +154,7 @@
                 </div>
                 
                 <div id="storyMoral" class="mt-8 p-6 bg-gray-50 rounded-md">
-                    <h3 class="text-xl font-bold">Bài học rút ra:</h3>
+                    <h3 class="text-xl font-bold">Moral of the story:</h3>
                     <p id="moralText" class="mt-2 italic text-lg"></p>
                 </div>
             </div>
@@ -175,12 +175,12 @@
         let totalTasks = 32;
         let completedTasks = 0;
 
-        // Thêm validation cho các trường input số lượng
+        // Add validation for the number input fields
         const minParagraphsInput = document.getElementById('minParagraphs');
         const maxParagraphsInput = document.getElementById('maxParagraphs');
 
         function validateInputs() {
-            // Đảm bảo min không lớn hơn max
+            // Make sure min is not greater than max
             let minVal = parseInt(minParagraphsInput.value);
             let maxVal = parseInt(maxParagraphsInput.value);
             
@@ -188,18 +188,18 @@
                 maxParagraphsInput.value = minVal;
             }
             
-            // Đảm bảo các giá trị nằm trong khoảng cho phép
+            // Make sure the values are within the allowed range
             minParagraphsInput.value = Math.max(5, Math.min(100, minVal));
             maxParagraphsInput.value = Math.max(5, Math.min(100, maxVal));
         }
 
-        // Thêm event listeners cho các trường input
+        // Add event listeners for the input fields
         minParagraphsInput.addEventListener('change', validateInputs);
         maxParagraphsInput.addEventListener('change', validateInputs);
 
         function updateProgress(task, progress, total) {
             document.getElementById('currentTask').textContent = task;
-            // Nếu total được cung cấp, sử dụng nó, ngược lại sử dụng totalTasks
+            // If total is provided, use it, otherwise use totalTasks
             const totalToUse = total || totalTasks;
             const percentage = Math.round((progress / totalToUse) * 100);
             document.getElementById('progressBar').style.width = `${percentage}%`;
@@ -227,7 +227,7 @@
             
             // Reset progress
             completedTasks = 0;
-            updateProgress('Đang tạo câu chuyện...', 0);
+            updateProgress('Creating story...', 0);
             updateTaskStatus('task1', 'in-progress');
             updateTaskStatus('task2', 'pending');
             updateTaskStatus('task3', 'pending');
@@ -242,26 +242,26 @@
                 
                 const data = await response.json();
                 
-                // Cập nhật totalTasks dựa trên số lượng đoạn văn thực tế
+                // Update totalTasks based on the actual number of paragraphs
                 const actualTotalTasks = data.paragraphs.length + 2; // paragraphs + story + final processing
                 
-                // Cập nhật tiến trình cho story
-                updateProgress('Đã tạo xong câu chuyện', 1, actualTotalTasks);
+                // Update progress for the story
+                updateProgress('Finished creating the story', 1, actualTotalTasks);
                 updateTaskStatus('task1', 'completed');
                 updateTaskStatus('task2', 'in-progress');
                 
-                // Hiển thị kết quả
+                // Display the results
                 document.getElementById('storyTitle').textContent = data.title;
                 
                 const storyContent = document.getElementById('storyContent');
                 storyContent.innerHTML = '';
                 
-                // Cập nhật tiến trình cho mỗi hình ảnh
+                // Update progress for each image
                 data.paragraphs.forEach((paragraph, index) => {
                     const section = document.createElement('div');
                     section.className = 'flex flex-col md:flex-row gap-6 items-center p-4 border rounded-lg mb-8';
                     
-                    // Thêm hình ảnh và nút xem prompt
+                    // Add image and view prompt button
                     if (data.images && data.images[index]) {
                         const imgContainer = document.createElement('div');
                         imgContainer.className = 'w-full md:w-1/2 relative';
@@ -270,48 +270,48 @@
                             const img = document.createElement('img');
                             img.src = data.images[index].url;
                             img.className = 'w-full h-auto rounded-lg shadow-lg';
-                            img.alt = `Hình minh họa ${index + 1}`;
+                            img.alt = `Illustration ${index + 1}`;
                             imgContainer.appendChild(img);
                         }
 
-                        // Hiển thị prompt
+                        // Display the prompt
                         const promptContainer = document.createElement('div');
                         promptContainer.className = 'mt-2';
                         
                         if (!data.images[index].url) {
-                            // Nếu không có URL (chế độ chỉ tạo prompt), hiển thị prompt trực tiếp
+                            // If there is no URL (prompt-only mode), display the prompt directly
                             const promptText = document.createElement('div');
                             promptText.className = 'bg-gray-50 p-4 rounded-lg text-sm text-gray-700 whitespace-pre-wrap';
                             promptText.textContent = data.images[index].prompt;
                             promptContainer.appendChild(promptText);
 
-                            // Thêm nút copy
+                            // Add a copy button
                             const copyBtn = document.createElement('button');
                             copyBtn.className = 'mt-2 bg-gray-200 text-gray-700 px-3 py-1 rounded-full hover:bg-gray-300 transition-all text-sm';
                             copyBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy prompt';
                             copyBtn.onclick = () => {
                                 navigator.clipboard.writeText(data.images[index].prompt);
-                                copyBtn.innerHTML = '<i class="fas fa-check mr-1"></i>Đã copy';
+                                copyBtn.innerHTML = '<i class="fas fa-check mr-1"></i>Copied';
                                 setTimeout(() => {
                                     copyBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy prompt';
                                 }, 2000);
                             };
                             promptContainer.appendChild(copyBtn);
                         } else {
-                            // Nếu có URL (chế độ tạo ảnh), hiển thị nút xem prompt
+                            // If there is a URL (image generation mode), display the view prompt button
                             const promptBtn = document.createElement('button');
                             promptBtn.className = 'absolute top-2 right-2 bg-white bg-opacity-75 hover:bg-opacity-100 text-gray-700 px-3 py-1 rounded-full shadow-md transition-all';
-                            promptBtn.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Xem prompt';
+                            promptBtn.innerHTML = '<i class="fas fa-info-circle mr-1"></i>View prompt';
                             promptBtn.onclick = () => showPrompt(data.images[index].prompt);
                             imgContainer.appendChild(promptBtn);
                         }
                         
                         imgContainer.appendChild(promptContainer);
                         section.appendChild(imgContainer);
-                        updateProgress(`Đang tạo hình ảnh ${index + 1}/${data.paragraphs.length}...`, 2 + index, actualTotalTasks);
+                        updateProgress(`Creating image ${index + 1}/${data.paragraphs.length}...`, 2 + index, actualTotalTasks);
                     }
                     
-                    // Thêm đoạn văn
+                    // Add the paragraph
                     const textContainer = document.createElement('div');
                     textContainer.className = 'w-full md:w-1/2 space-y-4';
                     
@@ -323,7 +323,7 @@
                     if (data.audio_files && data.audio_files[index]) {
                         const audioBtn = document.createElement('button');
                         audioBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-                        audioBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Phát đoạn này';
+                        audioBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Play this part';
                         audioBtn.onclick = () => playAudio(data.audio_files[index]);
                         textContainer.appendChild(audioBtn);
                     }
@@ -334,15 +334,15 @@
                 
                 document.getElementById('moralText').textContent = data.moral;
                 
-                // Hoàn thành
-                updateProgress('Hoàn thành!', actualTotalTasks, actualTotalTasks);
+                // Finished
+                updateProgress('Finished!', actualTotalTasks, actualTotalTasks);
                 updateTaskStatus('task2', 'completed');
                 updateTaskStatus('task3', 'completed');
                 
                 result.classList.remove('hidden');
             } catch (error) {
                 console.error('Error:', error);
-                alert('Có lỗi xảy ra khi tạo câu chuyện');
+                alert('An error occurred while creating the story');
                 updateTaskStatus('task1', 'error');
                 updateTaskStatus('task2', 'error');
                 updateTaskStatus('task3', 'error');
@@ -351,7 +351,7 @@
             }
         });
 
-        // Xử lý audio
+        // Audio handling
         function playAudio(audioUrl) {
             if (currentAudio) {
                 currentAudio.pause();
@@ -384,7 +384,7 @@
         }
 
         document.getElementById('playAll').onclick = () => {
-            // Xử lý phát toàn bộ audio
+            // Handle playing all audio
             const audioFiles = document.querySelectorAll('audio');
             if (audioFiles.length > 0) {
                 let currentIndex = 0;
@@ -414,7 +414,7 @@
         
         document.getElementById('pauseAll').onclick = pauseAudio;
 
-        // Thêm các hàm xử lý modal
+        // Add modal handling functions
         function showPrompt(prompt) {
             const modal = document.getElementById('promptModal');
             const promptText = document.getElementById('promptText');
@@ -422,12 +422,12 @@
             modal.style.display = 'block';
         }
 
-        // Đóng modal khi click vào nút close
+        // Close the modal when the close button is clicked
         document.querySelector('.close').onclick = function() {
             document.getElementById('promptModal').style.display = 'none';
         }
 
-        // Đóng modal khi click bên ngoài
+        // Close the modal when clicking outside of it
         window.onclick = function(event) {
             const modal = document.getElementById('promptModal');
             if (event.target == modal) {
