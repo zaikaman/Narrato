@@ -342,7 +342,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
         
         # Remove trailing comma after the last element of the array and object
-        response_text = re.sub(r',(\s*[\\\\\]}})', r'\1', response_text)
+        response_text = re.sub(r',(\s*[}\]])', r'\1', response_text)
         response_text = re.sub(r',\s*"moral":', r',"moral":', response_text)
         
         # Remove extra whitespace and reformat JSON

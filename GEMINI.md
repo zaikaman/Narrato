@@ -1,0 +1,1 @@
+Always start using the MCP server sequential thinking before doing anything, there's a folder called .gemini, inside it is settings.json, you're supposed to use the npx command to start it, and always use it.
