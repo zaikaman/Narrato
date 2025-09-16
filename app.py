@@ -13,6 +13,7 @@ from asgiref.sync import sync_to_async
 import re
 import traceback
 import requests
+import uuid
 
 # Shov.com configuration
 SHOV_API_KEY = os.getenv("SHOV_API_KEY")
@@ -152,78 +153,55 @@ elevenlabs_client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 os.environ["FAL_KEY"] = FAL_KEY
 
 async def generate_image(prompt):
-    """Generate image from prompt using FAL.ai"""
+    """Generate image from prompt using Gemini"""
     try:
-        print(f"\n=== Starting generate_image ===")
+        print(f"\n=== Starting generate_image with Gemini ===")
         print(f"Input prompt: {prompt}")
-        
-        # Make sure the prompt is a string and not too long
-        if isinstance(prompt, dict):
-            prompt = str(prompt)
-        
-        # Limit prompt length and clean it up
-        prompt = prompt[:500]
-        prompt = re.sub(r'["\'\n]', '', prompt)
-        
-        # Add style to prompt
-        enhanced_prompt = f"{prompt}, digital art style, high quality, detailed, vibrant colors"
-        print(f"Enhanced prompt: {enhanced_prompt}")
 
-        # Create request
-        request_data = {
-            "prompt": enhanced_prompt,
-            "image_size": "landscape_16_9",
-            "num_inference_steps": 30,
-            "guidance_scale": 7.5,
-            "num_images": 1,
-            "enable_safety_checker": True
-        }
-        print(f"Request data: {json.dumps(request_data, indent=2)}")
+        # Get a new API key
+        api_key = await api_key_manager.get_next_key()
+        genai.configure(api_key=api_key)
+        print("Using new API key for image generation")
 
-        print("Submitting request to FAL.ai...")
-        handler = await fal_client.submit_async(
-            "fal-ai/flux/dev",
-            arguments=request_data
-        )
-        print(f"Request ID: {handler.request_id}")
+        model = genai.GenerativeModel("gemini-2.5-flash-image-preview")
+        response = await sync_to_async(model.generate_content)(prompt)
+
+        image_data = None
+        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                if part.inline_data is not None:
+                    image_data = part.inline_data.data
+                    break
         
-        print("Waiting for result...")
-        async for event in handler.iter_events(with_logs=True):
-            print(f"Event: {event}")
+        if image_data:
+            if not os.path.exists("static/generated_images"):
+                os.makedirs("static/generated_images")
             
-        result = await handler.get()
-        print(f"Got result: {result}")
-        
-        if result and isinstance(result, dict):
-            if 'images' in result and len(result['images']) > 0:
-                if isinstance(result['images'][0], dict) and 'url' in result['images'][0]:
-                    image_url = result['images'][0]['url']
-                elif isinstance(result['images'][0], str):
-                    image_url = result['images'][0]
-                else:
-                    print(f"Unexpected image format: {result['images'][0]}")
-                    return None
-            elif 'image' in result:
-                image_url = result['image']
-            elif 'url' in result:
-                image_url = result['url']
-            else:
-                print(f"No image URL found in result: {result}")
-                return None
+            filename = f"{uuid.uuid4()}.png"
+            filepath = os.path.join("static/generated_images", filename)
+            
+            with open(filepath, "wb") as f:
+                f.write(image_data)
                 
-            print(f"Image generated successfully: {image_url}")
-            print("=== Finished generate_image ===\n")
-            return image_url
+            image_url = f"/static/generated_images/{filename}"
             
-        print(f"Invalid result format: {result}")
-        print("=== Finished generate_image with error ===\n")
-        return None
-        
+            print(f"Image generated successfully: {image_url}")
+            print("=== Finished generate_image with Gemini ===\n")
+            return image_url
+        else:
+            print("No image data found in Gemini response")
+            print(f"Gemini response: {response}")
+            return None
+
     except Exception as e:
-        print(f"Error creating image: {str(e)}")
+        print(f"Error creating image with Gemini: {str(e)}")
         print(f"Stack trace: {traceback.format_exc()}")
-        print("=== Finished generate_image with exception ===\n")
+        print("=== Finished generate_image with Gemini with exception ===\n")
         return None
+
+
+
+
 
 def find_character(name, char_db):
     """Find character information in the database
@@ -847,6 +825,47 @@ async def generate_story():
         print(f"Stack trace: {traceback.format_exc()}")
         print("=== Finished generate_story endpoint with error ===\n")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/test_image')
+def test_image():
+    try:
+        prompt = "A pixel art style image of a cat sitting on a pile of books."
+        
+        # Use the main API key
+        genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+        
+        model = genai.GenerativeModel("gemini-2.5-flash-image-preview")
+        response = model.generate_content(prompt)
+
+        image_data = None
+        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                if part.inline_data is not None:
+                    image_data = part.inline_data.data
+                    break
+        
+        if image_data:
+            if not os.path.exists("static/generated_images"):
+                os.makedirs("static/generated_images")
+            
+            filename = f"test_{uuid.uuid4()}.png"
+            filepath = os.path.join("static/generated_images", filename)
+            
+            with open(filepath, "wb") as f:
+                f.write(image_data)
+                
+            image_url = f"/static/generated_images/{filename}"
+            return render_template('test_image.html', image_url=image_url, error=None)
+        else:
+            error_message = f"No image data found in Gemini response: {response}"
+            print(error_message)
+            return render_template('test_image.html', image_url=None, error=error_message)
+
+    except Exception as e:
+        error_message = f"Error creating image with Gemini: {str(e)}"
+        print(error_message)
+        print(f"Stack trace: {traceback.format_exc()}")
+        return render_template('test_image.html', image_url=None, error=error_message)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
