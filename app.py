@@ -5,9 +5,6 @@ import google.generativeai as genai
 from elevenlabs.client import ElevenLabs
 import json
 import tempfile
-import moviepy.video.io.ImageSequenceClip as ImageSequenceClip
-import moviepy.audio.io.AudioFileClip as AudioFileClip
-import moviepy.video.compositing.CompositeVideoClip as CompositeVideoClip
 import fal_client
 import asyncio
 from asgiref.sync import sync_to_async
