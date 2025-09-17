@@ -1,3 +1,7 @@
+        document.addEventListener('touchmove', function(event) {
+    if (event.scale !== 1) { event.preventDefault(); }
+}, { passive: false });
+
         let currentAudio = null;
         let isPlaying = false;
         let totalTasks = 32;
