@@ -45,9 +45,11 @@
             
             const loading = document.getElementById('loading');
             const result = document.getElementById('result');
+            const gamePrompt = document.getElementById('game-prompt');
             
             loading.classList.remove('hidden');
             result.classList.add('hidden');
+            gamePrompt.classList.remove('hidden');
             
             // Reset progress
             completedTasks = 0;
@@ -99,6 +101,8 @@
                     displayResults(data.data);
                     eventSource.close();
                     loading.classList.add('hidden');
+                    stopGame(); // Stop the game
+                    document.getElementById('game-container').classList.add('hidden');
                 }
             };
 
@@ -111,6 +115,16 @@
                 eventSource.close();
                 loading.classList.add('hidden');
             };
+        });
+
+        document.getElementById('play-game-yes').addEventListener('click', () => {
+            document.getElementById('game-prompt').classList.add('hidden');
+            document.getElementById('game-container').classList.remove('hidden');
+            startGame();
+        });
+
+        document.getElementById('play-game-no').addEventListener('click', () => {
+            document.getElementById('game-prompt').classList.add('hidden');
         });
 
         function displayResults(data) {

@@ -8,6 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='game.css') }}">
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-8">
@@ -123,6 +124,16 @@
                         </div>
                     </div>
                 </div>
+                <div id="game-prompt" class="hidden mt-4 text-center">
+                    <p>Do you want to play a game while you wait?</p>
+                    <button id="play-game-yes" class="pixel-button">Yes</button>
+                    <button id="play-game-no" class="pixel-button">No</button>
+                </div>
+                <div id="game-container" class="hidden">
+                    <div id="bird"></div>
+                    <div id="score">Score: 0</div>
+                    <button id="play-again-button" class="pixel-button">Play Again</button>
+                </div>
             </div>
 
             <div id="result" class="hidden mt-6 space-y-8">
@@ -158,5 +169,6 @@
     </div>
 
     <script src="{{ url_for('static', filename='main.js') }}"></script>
+    <script src="{{ url_for('static', filename='game.js') }}"></script>
 </body>
 </html> 
