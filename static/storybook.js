@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
             titleElement.classList.add('hidden');
             storybook.classList.remove('hidden');
             showPage(currentPage);
-        }, 5000);
+        }, 3000);
     });
 
     function createPage(pageData) {
