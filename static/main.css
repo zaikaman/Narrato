@@ -275,3 +275,71 @@ body {
     padding: 2rem;
     text-align: center;
 }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .header {
+        padding: 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-title {
+        font-size: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    .story-form-container, .moral-container {
+        padding: 1.5rem;
+    }
+
+    .modal-content {
+        width: 90%;
+        margin: 10% auto;
+    }
+
+    .flex.justify-between.items-center {
+        flex-direction: column;
+    }
+
+    .flex.items-center {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        font-size: 14px;
+    }
+
+    .header {
+        padding: 0.5rem;
+    }
+
+    .header-title {
+        font-size: 1.2rem;
+    }
+
+    .story-form-container, .moral-container {
+        padding: 1rem;
+    }
+
+    .modal-content {
+        width: 95%;
+        padding: 15px;
+        margin: 5% auto;
+    }
+
+    .pixel-button {
+        padding: 8px 15px;
+        font-size: 0.9rem;
+    }
+
+    .back-button {
+        font-size: 1rem;
+    }
+
+    .container.mx-auto.px-4.py-8 {
+        padding: 1rem;
+    }
+}

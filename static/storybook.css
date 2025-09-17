@@ -138,3 +138,52 @@ body {
 .back-button:hover {
     color: #4CAF50;
 }
+
+@media (max-width: 800px) {
+    #storybook {
+        width: 95%;
+        height: auto;
+        max-height: 90vh;
+        padding: 1rem;
+    }
+
+    .page img {
+        max-width: 80%;
+    }
+
+    .page p {
+        font-size: 1em;
+    }
+
+    .pixel-button {
+        font-size: 1.5em;
+        padding: 8px 15px;
+    }
+
+    #prev-btn {
+        left: 10px;
+    }
+
+    #next-btn {
+        right: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    #storybook {
+        padding: 0.5rem;
+    }
+
+    .page p {
+        font-size: 0.9em;
+    }
+
+    .pixel-button {
+        font-size: 1.2em;
+        bottom: 10px;
+    }
+
+    #title-screen h1 {
+        font-size: 3em;
+    }
+}
