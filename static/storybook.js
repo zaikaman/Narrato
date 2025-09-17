@@ -36,13 +36,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const playStoryBtn = document.getElementById('play-story-btn');
 
     playStoryBtn.addEventListener('click', () => {
+        // Hide the play button
+        playStoryBtn.classList.add('hidden');
+
         // Play title audio
         playAudio(storyData.audio_files[0]);
 
-        // Hide the title screen and show the storybook
-        titleScreen.classList.add('hidden');
-        storybook.classList.remove('hidden');
-        showPage(currentPage);
+        // Wait 5 seconds, then hide the title and show the story
+        setTimeout(() => {
+            titleScreen.classList.add('hidden');
+            storybook.classList.remove('hidden');
+            showPage(currentPage);
+        }, 5000);
     });
 
     function createPage(pageData) {
