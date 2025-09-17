@@ -2,10 +2,9 @@ flask[async]
 asgiref
 google-generativeai
 python-dotenv
-elevenlabs
 Pillow
 requests
 python-multipart
-fal-client
 aiohttp
 cloudinary
+speechify-api==1.1.1

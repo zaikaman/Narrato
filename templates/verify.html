@@ -15,13 +15,17 @@
             <input type="text" id="otp" name="pin" required>
             <input type="submit" value="Verify" class="pixel-button">
         </form>
+        <div id="flash-messages" data-messages="{{ get_flashed_messages(with_categories=true)|tojson }}" style="display: none;"></div>
         <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
+        const messagesDiv = document.getElementById('flash-messages');
+        const messagesData = messagesDiv.getAttribute('data-messages');
+        if (messagesData) {
+            const messages = JSON.parse(messagesData);
+            if (messages) {
+                messages.forEach(function(message) {
                     Toastify({
-                        text: "{{ message }}",
+                        text: message[1],
                         duration: 3000,
                         close: true,
                         gravity: "top",
@@ -31,9 +35,9 @@
                             fontFamily: '"Press Start 2P", cursive'
                         }
                     }).showToast();
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+                });
+            }
+        }
     </script>
 </body>
 </html>

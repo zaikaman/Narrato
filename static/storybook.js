@@ -4,13 +4,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageContainer = document.getElementById('page-container');
     const prevBtn = document.getElementById('prev-btn');
     const nextBtn = document.getElementById('next-btn');
+    const audioPlayer = document.getElementById('audio-player');
 
     let currentPage = 0;
+
+    function playAudio(audioUrl) {
+        if (audioPlayer.src !== audioUrl) {
+            audioPlayer.src = audioUrl;
+        }
+        audioPlayer.play();
+    }
+
+    // Play title audio immediately
+    playAudio(storyData.audio_files[0]);
 
     setTimeout(() => {
         titleScreen.classList.add('hidden');
         storybook.classList.remove('hidden');
-        showPage(currentPage);
+        setTimeout(() => {
+            showPage(currentPage);
+        }, 2000);
     }, 5000);
 
     function createPage(pageData) {
@@ -39,6 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 page.classList.remove('active');
             }
         });
+
+        playAudio(storyData.audio_files[pageNumber + 1]);
 
         if (pageNumber === 0) {
             prevBtn.classList.add('hidden');

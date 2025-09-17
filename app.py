@@ -10,9 +10,10 @@ from flask import Flask, render_template, request, jsonify, send_file, session, 
 
 from dotenv import load_dotenv
 import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), 'speechify-api-sdk-python', 'src'))
 import google.generativeai as genai
-from elevenlabs.client import ElevenLabs
-import json
+from speechify import AsyncSpeechify, Speechify
 import tempfile
 import fal_client
 import asyncio
@@ -21,6 +22,8 @@ import re
 import traceback
 import requests
 import uuid
+import base64
+import json
 
 # Shov.com configuration
 SHOV_API_KEY = os.getenv("SHOV_API_KEY")
@@ -185,12 +188,13 @@ def login_required(f):
 
 # Configure API keys
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
+SPEECHIFY_KEY = os.getenv('SPEECHIFY_KEY')
 FAL_KEY = os.getenv('FAL_KEY')
 
 genai.configure(api_key=GOOGLE_API_KEY)
-elevenlabs_client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 os.environ["FAL_KEY"] = FAL_KEY
+speechify_client = AsyncSpeechify(token=SPEECHIFY_KEY)
+speechify_sync_client = Speechify(token=SPEECHIFY_KEY)
 
 async def generate_image(prompt):
     """Generate image from prompt using Runware API and upload to Cloudinary"""
@@ -265,30 +269,42 @@ def find_character(name, char_db):
             return group, 'group'
     return None, None
 
-@sync_to_async
-def generate_voice(text, voice_id="pNInz6obpgDQGcFmaJgB"):
-    """Generate voice from text using ElevenLabs"""
+async def generate_voice(text):
+    """Generate voice from text using Speechify and upload to Cloudinary"""
     try:
-        # Create audio stream from text
-        audio_stream = elevenlabs_client.text_to_speech.convert_as_stream(
-            text=text,
-            voice_id=voice_id,
-            model_id="eleven_multilingual_v2"
+        ssml_input = f'<speak><speechify:style emotion="assertive">{text}</speechify:style></speak>'
+        response = await speechify_client.tts.audio.speech(
+            input=ssml_input,
+            voice_id="oliver",
+            audio_format="mp3"
         )
         
-        # Save audio stream to a temporary file
-        temp_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
-        
-        # Write each chunk to the file
-        for chunk in audio_stream:
-            if isinstance(chunk, bytes):
-                temp_file.write(chunk)
-        
-        temp_file.close()
-        return temp_file.name
+        audio_bytes = base64.b64decode(response.audio_data)
+
+        # Save audio to a temporary file
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_audio_file:
+            temp_audio_file.write(audio_bytes)
+            temp_audio_path = temp_audio_file.name
+
+        # Upload the audio file to Cloudinary
+        upload_result = await sync_to_async(cloudinary.uploader.upload)(
+            temp_audio_path,
+            resource_type="video",
+            folder="storybook_audio",
+            public_id=f"{uuid.uuid4()}"
+        )
+
+        # Clean up the temporary file
+        os.remove(temp_audio_path)
+
+        cloudinary_url = upload_result.get('secure_url')
+        print(f"Audio uploaded to Cloudinary: {cloudinary_url}")
+        return cloudinary_url
+
     except Exception as e:
         print(f"Error creating voice: {str(e)}")
         return None
+
 
 def check_paragraph_length(paragraph):
     """Check and adjust paragraph length to not exceed 30 words"""
@@ -790,23 +806,19 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
     print(f"Image mode: {image_mode}")
     print(f"Paragraph range: {min_paragraphs}-{max_paragraphs}")
     
-    total_steps = min_paragraphs + 4 # story, style, characters, prompts, images
-    current_step = 0
-
     def progress_update(task, step, total, data=None):
         return {"task": task, "progress": step, "total": total, "data": data}
 
     try:
-        # Generate story content
-        current_step += 1
-        yield progress_update('Creating story content...', current_step, total_steps)
+        # 1. Generate story content
+        yield progress_update('Creating story content...', 0, 100)
         story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
         story_data['previous_prompts'] = []  # Initialize a list to save the prompt history
-        yield progress_update('Story content generated', current_step, total_steps, story_data)
+        yield progress_update('Story content generated', 10, 100, story_data)
+        num_paragraphs = len(story_data['paragraphs'])
 
-        # Create style guide
-        current_step += 1
-        yield progress_update('Generating style guide...', current_step, total_steps)
+        # 2. Create style guide
+        yield progress_update('Generating style guide...', 10, 100)
         api_key = await api_key_manager.get_next_key()
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-2.0-flash')
@@ -826,7 +838,7 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
                 "perspective": "How scenes should be framed"
             }}
         }}
-        """)
+        """ ) 
         
         try:
             style_text = style_guide.text.strip()
@@ -846,11 +858,10 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
                     "perspective": "Varied angles to enhance dramatic effect"
                 }
             }
-        yield progress_update('Style guide created', current_step, total_steps, story_data)
+        yield progress_update('Style guide created', 15, 100, story_data)
 
-        # Analyze and create character database
-        current_step += 1
-        yield progress_update('Analyzing characters...', current_step, total_steps)
+        # 3. Analyze and create character database
+        yield progress_update('Analyzing characters...', 15, 100)
         char_data = await analyze_story_characters(story_data)
         if not char_data:
             story_data['character_database'] = {
@@ -858,55 +869,62 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
                 "supporting_characters": [],
                 "groups": []
             }
-        yield progress_update('Characters analyzed', current_step, total_steps, story_data)
+        yield progress_update('Characters analyzed', 20, 100, story_data)
         
-        # Generate image prompts
-        current_step += 1
-        yield progress_update('Generating image prompts...', current_step, total_steps)
+        # 4. Generate image prompts
+        yield progress_update('Generating image prompts...', 20, 100)
         image_prompts = []
         for i, paragraph in enumerate(story_data['paragraphs']):
             prompt = await generate_image_prompt(paragraph, story_data, i)
             image_prompts.append(prompt)
-            yield progress_update(f'Generated prompt {i+1}/{len(story_data["paragraphs"] )}', current_step, total_steps)
+            progress = 20 + int(10 * (i + 1) / num_paragraphs)
+            yield progress_update(f'Generated prompt {i+1}/{num_paragraphs}', progress, 100)
 
-        # Generate images
+        # 5. Generate images
         if image_mode == 'generate':
-            total_steps = current_step + len(image_prompts)
+            yield progress_update('Generating images...', 30, 100)
             image_data = []
             for i, prompt in enumerate(image_prompts):
-                current_step += 1
-                yield progress_update(f'Generating image {i+1}/{len(image_prompts)}...', current_step, total_steps)
                 image_url = await generate_image(prompt)
                 image_data.append({'url': image_url, 'prompt': prompt})
+                progress = 30 + int(40 * (i + 1) / num_paragraphs)
+                yield progress_update(f'Generating image {i+1}/{num_paragraphs}...', progress, 100)
             story_data['images'] = image_data
         else:
             story_data['images'] = [{'prompt': prompt, 'url': None} for prompt in image_prompts]
+            yield progress_update('Skipping image generation', 70, 100)
+
+        # 6. Generate audio files
+        yield progress_update('Generating audio files...', 70, 100)
+        audio_files = []
+        title_audio_url = await generate_voice(story_data['title'])
+        audio_files.append(title_audio_url)
+        progress = 70 + int(30 * 1 / (num_paragraphs + 1))
+        yield progress_update(f'Generated audio 1/{num_paragraphs + 1}', progress, 100)
+
+        for i, paragraph in enumerate(story_data['paragraphs']):
+            audio_url = await generate_voice(paragraph)
+            audio_files.append(audio_url)
+            progress = 70 + int(30 * (i + 2) / (num_paragraphs + 1))
+            yield progress_update(f'Generated audio {i+2}/{num_paragraphs + 1}', progress, 100)
+        
+        story_data['audio_files'] = audio_files
 
         # Finalize
-        story_data['audio_files'] = []
         story_data['email'] = email
         story_data['story_uuid'] = str(uuid.uuid4())
         shov_add('stories', story_data)
         
-        yield progress_update('Finished!', total_steps, total_steps, story_data)
+        yield progress_update('Finished!', 100, 100, story_data)
         
     except Exception as e:
         print(f"Error in generate_story endpoint: {str(e)}")
         print(f"Stack trace: {traceback.format_exc()}")
-        yield progress_update('Error', total_steps, total_steps, {"error": str(e)})
+        yield progress_update('Error', 100, 100, {"error": str(e)})
 
 
-@app.route('/test_image')
-async def test_image():
-    try:
-        prompt = "A pixel art style image of a human sitting on a pile of books."
-        image_url = await generate_image(prompt)
-        return await sync_to_async(render_template)('test_image.html', image_url=image_url, error=None)
-    except Exception as e:
-        error_message = f"Error creating image: {str(e)}"
-        print(error_message)
-        print(f"Stack trace: {traceback.format_exc()}")
-        return await sync_to_async(render_template)('test_image.html', image_url=None, error=error_message)
+
+
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
