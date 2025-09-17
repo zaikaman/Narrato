@@ -10,6 +10,11 @@
     <div class="story-form-container">
         <h2>Verify OTP</h2>
         <p>An OTP has been sent to {{ email }}. Please enter it below to login.</p>
+        <form method="POST">
+            <label for="otp">OTP:</label>
+            <input type="text" id="otp" name="pin" required>
+            <input type="submit" value="Verify" class="pixel-button">
+        </form>
         <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script>
         {% with messages = get_flashed_messages(with_categories=true) %}
