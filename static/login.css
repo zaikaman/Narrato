@@ -37,6 +37,7 @@ body {
 
 .story-form-container input[type="email"],
 .story-form-container input[type="text"] {
+    font-family: 'Press Start 2P', cursive;
     background-color: #333;
     border: 2px solid #fff;
     color: #fff;
