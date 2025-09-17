@@ -35,6 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const playStoryBtn = document.getElementById('play-story-btn');
 
+    const titleElement = titleScreen.querySelector('h1');
+
     playStoryBtn.addEventListener('click', () => {
         // Hide the play button
         playStoryBtn.classList.add('hidden');
@@ -44,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Wait 5 seconds, then hide the title and show the story
         setTimeout(() => {
-            titleScreen.classList.add('hidden');
+            titleElement.classList.add('hidden');
             storybook.classList.remove('hidden');
             showPage(currentPage);
         }, 5000);
