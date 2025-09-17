@@ -33,16 +33,23 @@ document.addEventListener('DOMContentLoaded', () => {
         audioPlayer.play();
     }
 
-    // Play title audio immediately
-    playAudio(storyData.audio_files[0]);
+    const playStoryBtn = document.getElementById('play-story-btn');
 
-    setTimeout(() => {
-        titleScreen.classList.add('hidden');
-        storybook.classList.remove('hidden');
+    playStoryBtn.addEventListener('click', () => {
+        // Play title audio
+        playAudio(storyData.audio_files[0]);
+
+        // Hide the play button
+        playStoryBtn.classList.add('hidden');
+
         setTimeout(() => {
-            showPage(currentPage);
-        }, 2000);
-    }, 5000);
+            titleScreen.classList.add('hidden');
+            storybook.classList.remove('hidden');
+            setTimeout(() => {
+                showPage(currentPage);
+            }, 2000);
+        }, 5000);
+    });
 
     function createPage(pageData) {
         const page = document.createElement('div');
