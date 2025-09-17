@@ -1,10 +1,7 @@
-import time
-from urllib.parse import unquote
 
+from urllib.parse import unquote
 import cloudinary
 import cloudinary.uploader
-
-import inspect
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, flash, Response
 
@@ -15,7 +12,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'speechify-api-sdk-pytho
 import google.generativeai as genai
 from speechify import AsyncSpeechify, Speechify
 import tempfile
-import fal_client
 import asyncio
 from asgiref.sync import sync_to_async
 import re
