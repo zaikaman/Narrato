@@ -1,4 +1,7 @@
 
+import cloudinary
+import cloudinary.uploader
+
 import inspect
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, flash, Response
@@ -132,6 +135,12 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
 load_dotenv()
 
+cloudinary.config(
+    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key = os.getenv("CLOUDINARY_KEY"),
+    api_secret = os.getenv("CLOUDINARY_SECRET")
+)
+
 print(f"SHOV_API_KEY: {os.getenv('SHOV_API_KEY')}")
 print(f"SHOV_PROJECT: {os.getenv('SHOV_PROJECT')}")
 
@@ -157,7 +166,7 @@ elevenlabs_client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 os.environ["FAL_KEY"] = FAL_KEY
 
 async def generate_image(prompt):
-    """Generate image from prompt using Runware API"""
+    """Generate image from prompt using Runware API and upload to Cloudinary"""
     try:
         print(f"\n=== Starting generate_image with Runware ===")
         print(f"Input prompt: {prompt}")
@@ -191,20 +200,13 @@ async def generate_image(prompt):
             image_response = await sync_to_async(requests.get)(image_url)
             image_response.raise_for_status()
 
-            if not os.path.exists("static/generated_images"):
-                os.makedirs("static/generated_images")
-            
-            filename = f"{uuid.uuid4()}.png"
-            filepath = os.path.join("static/generated_images", filename)
-            
-            with open(filepath, "wb") as f:
-                f.write(image_response.content)
+            # Upload the image to Cloudinary
+            upload_result = await sync_to_async(cloudinary.uploader.upload)(image_response.content)
+            cloudinary_url = upload_result.get('secure_url')
 
-            local_image_url = f"/static/generated_images/{filename}"
-            
-            print(f"Image generated successfully: {local_image_url}")
+            print(f"Image uploaded to Cloudinary: {cloudinary_url}")
             print("=== Finished generate_image with Runware ===\n")
-            return local_image_url
+            return cloudinary_url
         else:
             print("No image data found in Runware response")
             return None
@@ -214,6 +216,7 @@ async def generate_image(prompt):
         print(f"Stack trace: {traceback.format_exc()}")
         print("=== Finished generate_image with Runware with exception ===\n")
         return None
+
 
 
 
@@ -687,8 +690,9 @@ async def story_history():
 
 
 @app.route('/generate_story_stream', methods=['GET'])
-@login_required
 def generate_story_stream():
+    if 'email' not in session:
+        return redirect(url_for('login', next=request.url))
     prompt = request.args.get('prompt')
     image_mode = request.args.get('imageMode', 'generate')
     min_paragraphs = int(request.args.get('minParagraphs', 15))
