@@ -38,8 +38,11 @@
     </style>
 </head>
 <body>
+    <div class="header">
+        <a href="{{ url_for('index') }}" class="back-button">← Home</a>
+        <h1 class="header-title">Your Stories</h1>
+    </div>
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-4xl text-center my-8 text-white" style="text-shadow: 3px 3px #000;">Your Stories</h1>
         <div class="story-list">
             {% if stories %}
                 {% for story in stories %}
@@ -55,9 +58,7 @@
             {% else %}
                 <p>You haven't created any stories yet.</p>
             {% endif %}
-            <div class="text-center mt-8">
-                <a href="{{ url_for('index') }}" class="pixel-button">Back to Home</a>
-            </div>
+            
         </div>
     </div>
 
