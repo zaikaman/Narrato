@@ -36,12 +36,8 @@
 
         function updateTaskStatus(taskId, status) {
             const task = document.getElementById(taskId);
-            const icon = task.querySelector('i');
-            icon.className = 'fas mr-2 ' + 
-                (status === 'pending' ? 'fa-circle text-xs' :
-                 status === 'in-progress' ? 'fa-spinner fa-spin' :
-                 status === 'completed' ? 'fa-check text-green-500' :
-                 'fa-times text-red-500');
+            const icon = task.querySelector('.task-icon');
+            icon.className = `task-icon ${status}`;
         }
 
         document.getElementById('storyForm').addEventListener('submit', async (e) => {
@@ -61,123 +57,140 @@
             updateTaskStatus('task3', 'pending');
             
             const formData = new FormData(e.target);
-            
-            try {
-                const response = await fetch('/generate_story', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                // Update totalTasks based on the actual number of paragraphs
-                const actualTotalTasks = data.paragraphs.length + 2; // paragraphs + story + final processing
-                
-                // Update progress for the story
-                updateProgress('Finished creating the story', 1, actualTotalTasks);
-                updateTaskStatus('task1', 'completed');
-                updateTaskStatus('task2', 'in-progress');
-                
-                // Display the results
-                document.getElementById('storyTitle').textContent = data.title;
-                
-                const storyContent = document.getElementById('storyContent');
-                storyContent.innerHTML = '';
-                
-                // Update progress for each image
-                data.paragraphs.forEach((paragraph, index) => {
-                    const section = document.createElement('div');
-                    section.className = 'flex flex-col md:flex-row gap-6 items-center p-4 border rounded-lg mb-8';
-                    
-                    // Add image and view prompt button
-                    if (data.images && data.images[index]) {
-                        const imgContainer = document.createElement('div');
-                        imgContainer.className = 'w-full md:w-1/2 relative';
-                        
-                        if (data.images[index].url) {
-                            const img = document.createElement('img');
-                            img.src = data.images[index].url;
-                            img.className = 'w-full h-auto rounded-lg shadow-lg';
-                            img.alt = `Illustration ${index + 1}`;
-                            imgContainer.appendChild(img);
-                        }
+            const prompt = formData.get('prompt');
+            const imageMode = formData.get('imageMode');
+            const minParagraphs = formData.get('minParagraphs');
+            const maxParagraphs = formData.get('maxParagraphs');
 
-                        // Display the prompt
-                        const promptContainer = document.createElement('div');
-                        promptContainer.className = 'mt-2';
-                        
-                        if (!data.images[index].url) {
-                            // If there is no URL (prompt-only mode), display the prompt directly
-                            const promptText = document.createElement('div');
-                            promptText.className = 'bg-gray-50 p-4 rounded-lg text-sm text-gray-700 whitespace-pre-wrap';
-                            promptText.textContent = data.images[index].prompt;
-                            promptContainer.appendChild(promptText);
+            const eventSource = new EventSource(`/generate_story_stream?prompt=${prompt}&imageMode=${imageMode}&minParagraphs=${minParagraphs}&maxParagraphs=${maxParagraphs}`);
 
-                            // Add a copy button
-                            const copyBtn = document.createElement('button');
-                            copyBtn.className = 'mt-2 bg-gray-200 text-gray-700 px-3 py-1 rounded-full hover:bg-gray-300 transition-all text-sm';
-                            copyBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy prompt';
-                            copyBtn.onclick = () => {
-                                navigator.clipboard.writeText(data.images[index].prompt);
-                                copyBtn.innerHTML = '<i class="fas fa-check mr-1"></i>Copied';
-                                setTimeout(() => {
-                                    copyBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy prompt';
-                                }, 2000);
-                            };
-                            promptContainer.appendChild(copyBtn);
-                        } else {
-                            // If there is a URL (image generation mode), display the view prompt button
-                            const promptBtn = document.createElement('button');
-                            promptBtn.className = 'absolute top-2 right-2 bg-white bg-opacity-75 hover:bg-opacity-100 text-gray-700 px-3 py-1 rounded-full shadow-md transition-all';
-                            promptBtn.innerHTML = '<i class="fas fa-info-circle mr-1"></i>View prompt';
-                            promptBtn.onclick = () => showPrompt(data.images[index].prompt);
-                            imgContainer.appendChild(promptBtn);
-                        }
-                        
-                        imgContainer.appendChild(promptContainer);
-                        section.appendChild(imgContainer);
-                        updateProgress(`Creating image ${index + 1}/${data.paragraphs.length}...`, 2 + index, actualTotalTasks);
-                    }
-                    
-                    // Add the paragraph
-                    const textContainer = document.createElement('div');
-                    textContainer.className = 'w-full md:w-1/2 space-y-4';
-                    
-                    const p = document.createElement('p');
-                    p.className = 'text-lg leading-relaxed';
-                    p.textContent = paragraph;
-                    textContainer.appendChild(p);
-                    
-                    if (data.audio_files && data.audio_files[index]) {
-                        const audioBtn = document.createElement('button');
-                        audioBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-                        audioBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Play this part';
-                        audioBtn.onclick = () => playAudio(data.audio_files[index]);
-                        textContainer.appendChild(audioBtn);
-                    }
-                    
-                    section.appendChild(textContainer);
-                    storyContent.appendChild(section);
-                });
-                
-                document.getElementById('moralText').textContent = data.moral;
-                
-                // Finished
-                updateProgress('Finished!', actualTotalTasks, actualTotalTasks);
-                updateTaskStatus('task2', 'completed');
-                updateTaskStatus('task3', 'completed');
-                
-                result.classList.remove('hidden');
-            } catch (error) {
-                console.error('Error:', error);
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                if (data.error) {
+                    console.error('Error:', data.error);
+                    alert('An error occurred while creating the story');
+                    updateTaskStatus('task1', 'error');
+                    updateTaskStatus('task2', 'error');
+                    updateTaskStatus('task3', 'error');
+                    eventSource.close();
+                    loading.classList.add('hidden');
+                    return;
+                }
+
+                updateProgress(data.task, data.progress, data.total);
+
+                if (data.task.includes('Creating story content')) {
+                    updateTaskStatus('task1', 'in-progress');
+                } else if (data.task.includes('Story content generated')) {
+                    updateTaskStatus('task1', 'completed');
+                    updateTaskStatus('task2', 'in-progress');
+                } else if (data.task.includes('Generating image prompts')) {
+                    updateTaskStatus('task2', 'completed');
+                    updateTaskStatus('task3', 'in-progress');
+                } else if (data.task.includes('Generating image')) {
+                    updateTaskStatus('task3', 'in-progress');
+                }
+
+                if (data.task === 'Finished!') {
+                    updateTaskStatus('task1', 'completed');
+                    updateTaskStatus('task2', 'completed');
+                    updateTaskStatus('task3', 'completed');
+                    displayResults(data.data);
+                    eventSource.close();
+                    loading.classList.add('hidden');
+                }
+            };
+
+            eventSource.onerror = function(err) {
+                console.error("EventSource failed:", err);
                 alert('An error occurred while creating the story');
                 updateTaskStatus('task1', 'error');
                 updateTaskStatus('task2', 'error');
                 updateTaskStatus('task3', 'error');
-            } finally {
+                eventSource.close();
                 loading.classList.add('hidden');
-            }
+            };
         });
+
+        function displayResults(data) {
+            const result = document.getElementById('result');
+            result.classList.remove('hidden');
+            document.getElementById('storyTitle').textContent = data.title;
+            
+            const storyContent = document.getElementById('storyContent');
+            storyContent.innerHTML = '';
+            
+            data.paragraphs.forEach((paragraph, index) => {
+                const section = document.createElement('div');
+                section.className = 'flex flex-col md:flex-row gap-6 items-center p-4 border rounded-lg mb-8';
+                
+                if (data.images && data.images[index]) {
+                    const imgContainer = document.createElement('div');
+                    imgContainer.className = 'w-full md:w-1/2 relative';
+                    
+                    if (data.images[index].url) {
+                        const img = document.createElement('img');
+                        img.src = data.images[index].url;
+                        img.className = 'w-full h-auto rounded-lg shadow-lg';
+                        img.alt = `Illustration ${index + 1}`;
+                        imgContainer.appendChild(img);
+                    }
+
+                    const promptContainer = document.createElement('div');
+                    promptContainer.className = 'mt-2';
+                    
+                    if (!data.images[index].url) {
+                        const promptText = document.createElement('div');
+                        promptText.className = 'bg-gray-50 p-4 rounded-lg text-sm text-gray-700 whitespace-pre-wrap';
+                        promptText.textContent = data.images[index].prompt;
+                        promptContainer.appendChild(promptText);
+
+                        const copyBtn = document.createElement('button');
+                        copyBtn.className = 'mt-2 bg-gray-200 text-gray-700 px-3 py-1 rounded-full hover:bg-gray-300 transition-all text-sm';
+                        copyBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy prompt';
+                        copyBtn.onclick = () => {
+                            navigator.clipboard.writeText(data.images[index].prompt);
+                            copyBtn.innerHTML = '<i class="fas fa-check mr-1"></i>Copied';
+                            setTimeout(() => {
+                                copyBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy prompt';
+                            }, 2000);
+                        };
+                        promptContainer.appendChild(copyBtn);
+                    } else {
+                        const promptBtn = document.createElement('button');
+                        promptBtn.className = 'absolute top-2 right-2 bg-white bg-opacity-75 hover:bg-opacity-100 text-gray-700 px-3 py-1 rounded-full shadow-md transition-all';
+                        promptBtn.innerHTML = '<i class="fas fa-info-circle mr-1"></i>View prompt';
+                        promptBtn.onclick = () => showPrompt(data.images[index].prompt);
+                        imgContainer.appendChild(promptBtn);
+                    }
+                    
+                    imgContainer.appendChild(promptContainer);
+                    section.appendChild(imgContainer);
+                }
+                
+                const textContainer = document.createElement('div');
+                textContainer.className = 'w-full md:w-1/2 space-y-4';
+                
+                const p = document.createElement('p');
+                p.className = 'text-lg leading-relaxed';
+                p.textContent = paragraph;
+                textContainer.appendChild(p);
+                
+                if (data.audio_files && data.audio_files[index]) {
+                    const audioBtn = document.createElement('button');
+                    audioBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+                    audioBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Play this part';
+                    audioBtn.onclick = () => playAudio(data.audio_files[index]);
+                    textContainer.appendChild(audioBtn);
+                }
+                
+                section.appendChild(textContainer);
+                storyContent.appendChild(section);
+            });
+            
+            document.getElementById('moralText').textContent = data.moral;
+        }
 
         // Audio handling
         function playAudio(audioUrl) {

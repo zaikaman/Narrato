@@ -1,5 +1,7 @@
+
+import inspect
 from functools import wraps
-from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, flash, Response
 
 from dotenv import load_dotenv
 import os
@@ -136,10 +138,12 @@ print(f"SHOV_PROJECT: {os.getenv('SHOV_PROJECT')}")
 
 def login_required(f):
     @wraps(f)
-    async def decorated_function(*args, **kwargs):
+    def decorated_function(*args, **kwargs):
         if 'email' not in session:
             return redirect(url_for('login', next=request.url))
-        return await f(*args, **kwargs)
+        if inspect.iscoroutinefunction(f):
+            return asyncio.run(f(*args, **kwargs))
+        return f(*args, **kwargs)
     return decorated_function
 
 
@@ -153,27 +157,40 @@ elevenlabs_client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 os.environ["FAL_KEY"] = FAL_KEY
 
 async def generate_image(prompt):
-    """Generate image from prompt using Gemini"""
+    """Generate image from prompt using Runware API"""
     try:
-        print(f"\n=== Starting generate_image with Gemini ===")
+        print(f"\n=== Starting generate_image with Runware ===")
         print(f"Input prompt: {prompt}")
 
-        # Get a new API key
-        api_key = await api_key_manager.get_next_key()
-        genai.configure(api_key=api_key)
-        print("Using new API key for image generation")
+        url = "https://api.runware.ai/v1/imageInference"
+        headers = {
+            "Authorization": f"Bearer {os.getenv('RUNWARE_TOKEN')}",
+            "Content-Type": "application/json"
+        }
+        payload = [{
+            "taskType": "imageInference",
+            "taskUUID": str(uuid.uuid4()),
+            "outputType": "URL",
+            "outputFormat": "jpg",
+            "positivePrompt": prompt,
+            "model": "civitai:497255@552771",
+            "height": 1024,
+            "width": 1024,
+            "steps": 30,
+            "CFGScale": 7.5
+        }]
 
-        model = genai.GenerativeModel("gemini-2.5-flash-image-preview")
-        response = await sync_to_async(model.generate_content)(prompt)
+        response = await sync_to_async(requests.post)(url, headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
 
-        image_data = None
-        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data is not None:
-                    image_data = part.inline_data.data
-                    break
-        
-        if image_data:
+        if data.get("data") and data["data"][0].get("imageURL"):
+            image_url = data["data"][0]["imageURL"]
+            
+            # Download the image from the URL
+            image_response = await sync_to_async(requests.get)(image_url)
+            image_response.raise_for_status()
+
             if not os.path.exists("static/generated_images"):
                 os.makedirs("static/generated_images")
             
@@ -181,22 +198,21 @@ async def generate_image(prompt):
             filepath = os.path.join("static/generated_images", filename)
             
             with open(filepath, "wb") as f:
-                f.write(image_data)
-                
-            image_url = f"/static/generated_images/{filename}"
+                f.write(image_response.content)
+
+            local_image_url = f"/static/generated_images/{filename}"
             
-            print(f"Image generated successfully: {image_url}")
-            print("=== Finished generate_image with Gemini ===\n")
-            return image_url
+            print(f"Image generated successfully: {local_image_url}")
+            print("=== Finished generate_image with Runware ===\n")
+            return local_image_url
         else:
-            print("No image data found in Gemini response")
-            print(f"Gemini response: {response}")
+            print("No image data found in Runware response")
             return None
 
     except Exception as e:
-        print(f"Error creating image with Gemini: {str(e)}")
+        print(f"Error creating image with Runware: {str(e)}")
         print(f"Stack trace: {traceback.format_exc()}")
-        print("=== Finished generate_image with Gemini with exception ===\n")
+        print("=== Finished generate_image with Runware with exception ===\n")
         return None
 
 
@@ -401,7 +417,7 @@ async def analyze_story_characters(story_data):
         model = genai.GenerativeModel('gemini-2.0-flash')
         
         character_analysis = model.generate_content(f"""
-        You are a character designer creating consistent descriptions for all characters in this story.
+        You are a character designer creating consistent descriptions for all characters in this story. 
         Analyze the entire story carefully and create detailed, consistent descriptions that will be used for ALL images.
         
         Title: {story_data['title']}
@@ -670,31 +686,57 @@ async def story_history():
     return await sync_to_async(render_template)('history.html', stories=user_stories)
 
 
-@app.route('/generate_story', methods=['POST'])
+@app.route('/generate_story_stream', methods=['GET'])
 @login_required
-async def generate_story():
+def generate_story_stream():
+    prompt = request.args.get('prompt')
+    image_mode = request.args.get('imageMode', 'generate')
+    min_paragraphs = int(request.args.get('minParagraphs', 15))
+    max_paragraphs = int(request.args.get('maxParagraphs', 20))
+    email = session.get('email')
+
+    def generate():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            gen = generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, email)
+            while True:
+                try:
+                    progress = loop.run_until_complete(gen.__anext__())
+                    yield f"data: {json.dumps(progress)}\n\n"
+                except StopAsyncIteration:
+                    break
+        finally:
+            loop.close()
+
+    return Response(generate(), mimetype='text/event-stream')
+
+async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, email):
+    """Generate story and stream progress"""
     print("\n=== Starting generate_story endpoint ===")
-    prompt = request.form.get('prompt')
-    image_mode = request.form.get('imageMode', 'generate')  # Default is to generate images
-    min_paragraphs = int(request.form.get('minParagraphs', 15))  # Default is 15
-    max_paragraphs = int(request.form.get('maxParagraphs', 20))  # Default is 20
     print(f"Received prompt: {prompt}")
     print(f"Image mode: {image_mode}")
     print(f"Paragraph range: {min_paragraphs}-{max_paragraphs}")
     
+    total_steps = min_paragraphs + 4 # story, style, characters, prompts, images
+    current_step = 0
+
+    def progress_update(task, step, total, data=None):
+        return {"task": task, "progress": step, "total": total, "data": data}
+
     try:
         # Generate story content
-        print("Generating story content...")
+        current_step += 1
+        yield progress_update('Creating story content...', current_step, total_steps)
         story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
         story_data['previous_prompts'] = []  # Initialize a list to save the prompt history
-        print("Story content generated successfully")
+        yield progress_update('Story content generated', current_step, total_steps, story_data)
 
         # Create style guide
-        print("Generating style guide...")
+        current_step += 1
+        yield progress_update('Generating style guide...', current_step, total_steps)
         api_key = await api_key_manager.get_next_key()
         genai.configure(api_key=api_key)
-        print("Using new API key for style guide")
-        
         model = genai.GenerativeModel('gemini-2.0-flash')
         style_guide = model.generate_content(f"""
         Create a consistent art style guide for this story. Read the title and first few paragraphs:
@@ -721,9 +763,7 @@ async def generate_story():
             if not style_data.get('art_style'):
                 raise ValueError("Missing art_style in response")
             story_data['style_guide'] = style_data
-            print("Successfully created style guide")
         except Exception as e:
-            print(f"Could not parse style guide: {str(e)}")
             story_data['style_guide'] = {
                 "art_style": {
                     "overall_style": "Digital art style with realistic details",
@@ -734,138 +774,66 @@ async def generate_story():
                     "perspective": "Varied angles to enhance dramatic effect"
                 }
             }
+        yield progress_update('Style guide created', current_step, total_steps, story_data)
 
         # Analyze and create character database
-        print("Analyzing characters...")
+        current_step += 1
+        yield progress_update('Analyzing characters...', current_step, total_steps)
         char_data = await analyze_story_characters(story_data)
         if not char_data:
-            print("Failed to create character database, using default")
             story_data['character_database'] = {
                 "main_characters": [],
                 "supporting_characters": [],
                 "groups": []
             }
+        yield progress_update('Characters analyzed', current_step, total_steps, story_data)
         
-        # Generate image prompts in batches to avoid rate limits
-        print("Generating image prompts...")
+        # Generate image prompts
+        current_step += 1
+        yield progress_update('Generating image prompts...', current_step, total_steps)
         image_prompts = []
-        batch_size_gemini = 5  # Number of prompts to create before resting
-        
-        for i in range(0, len(story_data['paragraphs']), batch_size_gemini):
-            batch_paragraphs = story_data['paragraphs'][i:i + batch_size_gemini]
-            print("\nProcessing prompt batch {}/{}...".format(i // batch_size_gemini + 1, len(story_data['paragraphs']) // batch_size_gemini + 1))
-            
-            # Create prompts for the current batch
-            batch_prompts = []
-            for j, paragraph in enumerate(batch_paragraphs):
-                print(f"Generating prompt for paragraph {i + j + 1}...")
-                prompt = await generate_image_prompt(paragraph, story_data, i + j)
-                print(f"Generated prompt: {prompt}")
-                batch_prompts.append(prompt)
-            
-            image_prompts.extend(batch_prompts)
-            
-            # Rest for 15 seconds after each batch except for the last one
-            if i + batch_size_gemini < len(story_data['paragraphs']):
-                print("Waiting 15 seconds before next batch of prompts...")
-                await asyncio.sleep(15)
+        for i, paragraph in enumerate(story_data['paragraphs']):
+            prompt = await generate_image_prompt(paragraph, story_data, i)
+            image_prompts.append(prompt)
+            yield progress_update(f'Generated prompt {i+1}/{len(story_data["paragraphs"]) }', current_step, total_steps)
 
-        # If only creating prompts, don't call the image creation API
-        if image_mode == 'prompt':
-            print("Prompt-only mode, skipping image generation")
-            image_data = [{'prompt': prompt, 'url': None} for prompt in image_prompts]
-        else:
-            # Create images in parallel, divided into small groups to avoid overloading
-            print("\nGenerating images...")
-            batch_size_fal = 5  # Number of images to create at the same time
+        # Generate images
+        if image_mode == 'generate':
+            total_steps = current_step + len(image_prompts)
             image_data = []
-            
-            for i in range(0, len(image_prompts), batch_size_fal):
-                batch_prompts = image_prompts[i:i + batch_size_fal]
-                print("\nProcessing image batch {}/{}...".format(i // batch_size_fal + 1, len(image_prompts) // batch_size_fal + 1))
-                
-                batch_tasks = [generate_image(prompt) for prompt in batch_prompts]
-                batch_results = await asyncio.gather(*batch_tasks)
-                
-                # Filter out None URLs and save the prompt as well
-                batch_data = []
-                for url, prompt in zip(batch_results, batch_prompts):
-                    if url is not None:
-                        batch_data.append({
-                            'url': url,
-                            'prompt': prompt
-                        })
-                image_data.extend(batch_data)
-                
-                print(f"Batch {i//batch_size_fal + 1} completed: {len(batch_data)} images generated")
-                
-                # Wait a moment between batches to avoid API overload
-                if i + batch_size_fal < len(image_prompts):
-                    await asyncio.sleep(2)
-            
-            print(f"Total images generated: {len(image_data)}")
-        
-        # Add image URLs and prompts to the response
-        story_data['images'] = image_data
-        
-        # Do not use ElevenLabs due to free tier limitations
+            for i, prompt in enumerate(image_prompts):
+                current_step += 1
+                yield progress_update(f'Generating image {i+1}/{len(image_prompts)}...', current_step, total_steps)
+                image_url = await generate_image(prompt)
+                image_data.append({'url': image_url, 'prompt': prompt})
+            story_data['images'] = image_data
+        else:
+            story_data['images'] = [{'prompt': prompt, 'url': None} for prompt in image_prompts]
+
+        # Finalize
         story_data['audio_files'] = []
-        
-        # Add user email to story data
-        story_data['email'] = session['email']
-        
-        # Save the story to the "stories" collection
+        story_data['email'] = email
         shov_add('stories', story_data)
         
-        print("=== Finished generate_story endpoint successfully ===\n")
-        return jsonify(story_data)
+        yield progress_update('Finished!', total_steps, total_steps, story_data)
         
     except Exception as e:
         print(f"Error in generate_story endpoint: {str(e)}")
         print(f"Stack trace: {traceback.format_exc()}")
-        print("=== Finished generate_story endpoint with error ===\n")
-        return jsonify({"error": str(e)}), 500
+        yield progress_update('Error', total_steps, total_steps, {"error": str(e)})
+
 
 @app.route('/test_image')
-def test_image():
+async def test_image():
     try:
-        prompt = "A pixel art style image of a cat sitting on a pile of books."
-        
-        # Use the main API key
-        genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-        
-        model = genai.GenerativeModel("gemini-2.5-flash-image-preview")
-        response = model.generate_content(prompt)
-
-        image_data = None
-        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data is not None:
-                    image_data = part.inline_data.data
-                    break
-        
-        if image_data:
-            if not os.path.exists("static/generated_images"):
-                os.makedirs("static/generated_images")
-            
-            filename = f"test_{uuid.uuid4()}.png"
-            filepath = os.path.join("static/generated_images", filename)
-            
-            with open(filepath, "wb") as f:
-                f.write(image_data)
-                
-            image_url = f"/static/generated_images/{filename}"
-            return render_template('test_image.html', image_url=image_url, error=None)
-        else:
-            error_message = f"No image data found in Gemini response: {response}"
-            print(error_message)
-            return render_template('test_image.html', image_url=None, error=error_message)
-
+        prompt = "A pixel art style image of a human sitting on a pile of books."
+        image_url = await generate_image(prompt)
+        return await sync_to_async(render_template)('test_image.html', image_url=image_url, error=None)
     except Exception as e:
-        error_message = f"Error creating image with Gemini: {str(e)}"
+        error_message = f"Error creating image: {str(e)}"
         print(error_message)
         print(f"Stack trace: {traceback.format_exc()}")
-        return render_template('test_image.html', image_url=None, error=error_message)
+        return await sync_to_async(render_template)('test_image.html', image_url=None, error=error_message)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
