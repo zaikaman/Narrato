@@ -1,4 +1,5 @@
 import time
+from urllib.parse import unquote
 
 import cloudinary
 import cloudinary.uploader
@@ -663,10 +664,13 @@ def list_stories():
     """List all stories in the database"""
     return jsonify(shov_contents())
 
+from urllib.parse import unquote
+
 @app.route('/stories/<title>')
 def get_story(title):
     """Get a story from the database"""
-    story_response = shov_where('stories', {'title': title})
+    decoded_title = unquote(title)
+    story_response = shov_where('stories', {'title': decoded_title})
     stories = story_response.get('items', [])
     if stories:
         story = stories[0]['value']
