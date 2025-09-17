@@ -1,3 +1,4 @@
+import time
 
 import cloudinary
 import cloudinary.uploader
@@ -96,6 +97,34 @@ def shov_verify_otp(email, pin):
     response = requests.post(f"{SHOV_API_URL}/verify-otp/{PROJECT_NAME}", headers=headers, json=data)
     return response.json()
 
+def shov_remove(collection_name, item_id):
+    """Remove an item from a collection by its ID, with robust error handling."""
+    try:
+        headers = {
+            "Authorization": f"Bearer {SHOV_API_KEY}"
+        }
+        data = {"collection": collection_name}
+        print(f"--- Shov Remove --- PRE-REQUEST: Deleting {item_id} from {collection_name}")
+        response = requests.post(f"{SHOV_API_URL}/remove/{PROJECT_NAME}/{item_id}", headers=headers, json=data)
+        
+        print(f"--- Shov Remove --- POST-REQUEST: Status Code: {response.status_code}")
+        print(f"--- Shov Remove --- POST-REQUEST: Raw Response Text: {response.text[:500]}")
+
+        if 200 <= response.status_code < 300:
+            try:
+                return response.json()
+            except json.JSONDecodeError:
+                return {"success": False, "error": "JSONDecodeError", "details": "API returned success status but response was not valid JSON."}
+        else:
+            return {"success": False, "error": f"API returned status {response.status_code}", "details": response.text[:500]}
+
+    except requests.exceptions.RequestException as e:
+        print(f"--- Shov Remove --- FATAL: RequestException: {e}")
+        return {"success": False, "error": "RequestException", "details": str(e)}
+    except Exception as e:
+        print(f"--- Shov Remove --- FATAL: Unexpected error in shov_remove: {e}")
+        return {"success": False, "error": "Unexpected error", "details": str(e)}
+
 class APIKeyManager:
     """Manages and rotates API keys"""
     def __init__(self):
@@ -144,14 +173,11 @@ cloudinary.config(
 print(f"SHOV_API_KEY: {os.getenv('SHOV_API_KEY')}")
 print(f"SHOV_PROJECT: {os.getenv('SHOV_PROJECT')}")
 
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'email' not in session:
             return redirect(url_for('login', next=request.url))
-        if inspect.iscoroutinefunction(f):
-            return asyncio.run(f(*args, **kwargs))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -216,11 +242,6 @@ async def generate_image(prompt):
         print(f"Stack trace: {traceback.format_exc()}")
         print("=== Finished generate_image with Runware with exception ===\n")
         return None
-
-
-
-
-
 
 def find_character(name, char_db):
     """Find character information in the database
@@ -361,7 +382,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
         
         # Remove trailing comma after the last element of the array and object
-        response_text = re.sub(r',(\s*[}\]])', r'\1', response_text)
+        response_text = re.sub(r',(\s*[\}\]])', r'\1', response_text)
         response_text = re.sub(r',\s*"moral":', r',"moral":', response_text)
         
         # Remove extra whitespace and reformat JSON
@@ -533,7 +554,7 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
                 }}
             ]
         }}
-        """)
+        """ )
         
         try:
             char_mentions = json.loads(character_mention_analysis.text)
@@ -610,7 +631,7 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
         9. If a character appeared in previous prompts, use the SAME physical description
         
         Return ONLY the prompt, no additional text or explanations.
-        """)
+        """ )
         
         prompt = image_prompt_response.text.strip()
         # Remove quotes and special characters
@@ -626,42 +647,42 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
         return "A beautiful illustration in digital art style, vibrant colors, detailed"
 
 @app.route('/')
-async def index():
-    return await sync_to_async(render_template)('index.html')
+def index():
+    return render_template('index.html')
 
 @app.route('/audio/<path:filename>')
-async def serve_audio(filename):
+def serve_audio(filename):
     try:
-        return await sync_to_async(send_file)(filename, mimetype='audio/mpeg')
+        return send_file(filename, mimetype='audio/mpeg')
     except Exception as e:
         print(f"Error serving audio file: {str(e)}")
         return jsonify({"error": "Could not play audio file"}), 404
 
 @app.route('/stories')
-async def list_stories():
+def list_stories():
     """List all stories in the database"""
     return jsonify(shov_contents())
 
 @app.route('/stories/<title>')
-async def get_story(title):
+def get_story(title):
     """Get a story from the database"""
     story_response = shov_where('stories', {'title': title})
     stories = story_response.get('items', [])
     if stories:
         story = stories[0]['value']
-        return await sync_to_async(render_template)('story_view.html', story=story)
+        return render_template('story_view.html', story=story)
     return "Story not found", 404
 
 @app.route('/login', methods=['GET', 'POST'])
-async def login():
+def login():
     if request.method == 'POST':
         email = request.form['email']
         shov_send_otp(email)
         return redirect(url_for('verify', email=email))
-    return await sync_to_async(render_template)('login.html')
+    return render_template('login.html')
 
 @app.route('/verify', methods=['GET', 'POST'])
-async def verify():
+def verify():
     email = request.args.get('email')
     if request.method == 'POST':
         pin = request.form['pin']
@@ -672,27 +693,54 @@ async def verify():
         else:
             flash("Invalid OTP. Please try again.")
             return redirect(url_for('verify', email=email))
-    return await sync_to_async(render_template)('verify.html', email=email)
+    return render_template('verify.html', email=email)
 
 @app.route('/logout')
-async def logout():
+def logout():
     session.pop('email', None)
     return redirect(url_for('index'))
 
 
 @app.route('/history')
 @login_required
-async def story_history():
+def story_history():
     """Display user's story history"""
     stories_response = shov_where('stories', {'email': session['email']})
     user_stories = stories_response.get('items', [])
-    return await sync_to_async(render_template)('history.html', stories=user_stories)
+    return render_template('history.html', stories=user_stories)
 
+@app.route('/delete_story', methods=['POST'])
+@login_required
+def delete_story():
+    """Delete a story."""
+    data = request.get_json()
+    story_id = data.get('story_id')
+
+    if not story_id:
+        return jsonify({"success": False, "error": "Invalid request: No story ID provided."}), 400
+
+    # Verify ownership
+    stories_response = shov_where('stories', {'email': session['email']})
+    user_stories = stories_response.get('items', [])
+    owned_story_ids = [story['id'] for story in user_stories]
+    print(f"User owns stories with IDs: {owned_story_ids}")
+
+    if story_id in owned_story_ids:
+        print(f"User is authorized to delete story {story_id}. Proceeding with deletion.")
+        delete_response = shov_remove('stories', story_id)
+        print(f"shov_remove response: {delete_response}")
+
+        if delete_response.get('success'):
+            return jsonify({"success": True})
+        else:
+            error_msg = delete_response.get('error', 'Unknown error during deletion.')
+            return jsonify({"success": False, "error": error_msg}), 500
+    else:
+        print(f"User is NOT authorized to delete story {story_id}.")
+        return jsonify({"success": False, "error": "You are not authorized to delete this story."}), 403
 
 @app.route('/generate_story_stream', methods=['GET'])
 def generate_story_stream():
-    if 'email' not in session:
-        return redirect(url_for('login', next=request.url))
     prompt = request.args.get('prompt')
     image_mode = request.args.get('imageMode', 'generate')
     min_paragraphs = int(request.args.get('minParagraphs', 15))
@@ -799,7 +847,7 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
         for i, paragraph in enumerate(story_data['paragraphs']):
             prompt = await generate_image_prompt(paragraph, story_data, i)
             image_prompts.append(prompt)
-            yield progress_update(f'Generated prompt {i+1}/{len(story_data["paragraphs"]) }', current_step, total_steps)
+            yield progress_update(f'Generated prompt {i+1}/{len(story_data["paragraphs"] )}', current_step, total_steps)
 
         # Generate images
         if image_mode == 'generate':

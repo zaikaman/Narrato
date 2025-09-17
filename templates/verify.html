@@ -4,25 +4,31 @@
     <title>Verify OTP</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 </head>
 <body>
     <div class="story-form-container">
         <h2>Verify OTP</h2>
         <p>An OTP has been sent to {{ email }}. Please enter it below to login.</p>
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            <ul>
-            {% for message in messages %}
-              <li>{{ message }}</li>
-            {% endfor %}
-            </ul>
-          {% endif %}
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    Toastify({
+                        text: "{{ message }}",
+                        duration: 3000,
+                        close: true,
+                        gravity: "top",
+                        position: "right",
+                        style: {
+                            background: 'linear-gradient(to right, #ff5f6d, #ffc371)',
+                            fontFamily: '"Press Start 2P", cursive'
+                        }
+                    }).showToast();
+                {% endfor %}
+            {% endif %}
         {% endwith %}
-        <form method="POST">
-            <label for="pin">OTP:</label>
-            <input type="text" id="pin" name="pin" required>
-            <input type="submit" value="Verify" class="pixel-button">
-        </form>
-    </div>
+    </script>
 </body>
 </html>
