@@ -666,6 +666,8 @@ def list_stories():
 
 from urllib.parse import unquote
 
+
+
 @app.route('/stories/<title>')
 def get_story(title):
     """Get a story from the database"""
@@ -676,6 +678,20 @@ def get_story(title):
         story = stories[0]['value']
         return render_template('story_view.html', story=story)
     return "Story not found", 404
+
+
+@app.route('/view_story/<story_uuid>')
+def view_story(story_uuid):
+    """Get a story from the database by ID"""
+    story_response = shov_where('stories', {'story_uuid': story_uuid})
+    stories = story_response.get('items', [])
+    if stories:
+        story = stories[0]['value']
+        return render_template('story_view.html', story=story)
+    return "Story not found", 404
+
+
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -869,6 +885,7 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
         # Finalize
         story_data['audio_files'] = []
         story_data['email'] = email
+        story_data['story_uuid'] = str(uuid.uuid4())
         shov_add('stories', story_data)
         
         yield progress_update('Finished!', total_steps, total_steps, story_data)

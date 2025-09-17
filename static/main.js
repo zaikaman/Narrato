@@ -128,82 +128,14 @@
         });
 
         function displayResults(data) {
-            const result = document.getElementById('result');
-            result.classList.remove('hidden');
-            document.getElementById('storyTitle').textContent = data.title;
-            
-            const storyContent = document.getElementById('storyContent');
-            storyContent.innerHTML = '';
-            
-            data.paragraphs.forEach((paragraph, index) => {
-                const section = document.createElement('div');
-                section.className = 'flex flex-col md:flex-row gap-6 items-center p-4 border rounded-lg mb-8';
-                
-                if (data.images && data.images[index]) {
-                    const imgContainer = document.createElement('div');
-                    imgContainer.className = 'w-full md:w-1/2 relative';
-                    
-                    if (data.images[index].url) {
-                        const img = document.createElement('img');
-                        img.src = data.images[index].url;
-                        img.className = 'w-full h-auto rounded-lg shadow-lg';
-                        img.alt = `Illustration ${index + 1}`;
-                        imgContainer.appendChild(img);
-                    }
+            console.log(data);
+            const storyId = data.story_uuid;
+            const modal = document.getElementById('story-ready-modal');
+            modal.style.display = 'block';
 
-                    const promptContainer = document.createElement('div');
-                    promptContainer.className = 'mt-2';
-                    
-                    if (!data.images[index].url) {
-                        const promptText = document.createElement('div');
-                        promptText.className = 'bg-gray-50 p-4 rounded-lg text-sm text-gray-700 whitespace-pre-wrap';
-                        promptText.textContent = data.images[index].prompt;
-                        promptContainer.appendChild(promptText);
-
-                        const copyBtn = document.createElement('button');
-                        copyBtn.className = 'mt-2 bg-gray-200 text-gray-700 px-3 py-1 rounded-full hover:bg-gray-300 transition-all text-sm';
-                        copyBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy prompt';
-                        copyBtn.onclick = () => {
-                            navigator.clipboard.writeText(data.images[index].prompt);
-                            copyBtn.innerHTML = '<i class="fas fa-check mr-1"></i>Copied';
-                            setTimeout(() => {
-                                copyBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy prompt';
-                            }, 2000);
-                        };
-                        promptContainer.appendChild(copyBtn);
-                    } else {
-                        const promptBtn = document.createElement('button');
-                        promptBtn.className = 'absolute top-2 right-2 bg-white bg-opacity-75 hover:bg-opacity-100 text-gray-700 px-3 py-1 rounded-full shadow-md transition-all';
-                        promptBtn.innerHTML = '<i class="fas fa-info-circle mr-1"></i>View prompt';
-                        promptBtn.onclick = () => showPrompt(data.images[index].prompt);
-                        imgContainer.appendChild(promptBtn);
-                    }
-                    
-                    imgContainer.appendChild(promptContainer);
-                    section.appendChild(imgContainer);
-                }
-                
-                const textContainer = document.createElement('div');
-                textContainer.className = 'w-full md:w-1/2 space-y-4';
-                
-                const p = document.createElement('p');
-                p.className = 'text-lg leading-relaxed';
-                p.textContent = paragraph;
-                textContainer.appendChild(p);
-                
-                if (data.audio_files && data.audio_files[index]) {
-                    const audioBtn = document.createElement('button');
-                    audioBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-                    audioBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Play this part';
-                    audioBtn.onclick = () => playAudio(data.audio_files[index]);
-                    textContainer.appendChild(audioBtn);
-                }
-                
-                section.appendChild(textContainer);
-                storyContent.appendChild(section);
-            });
-            
-            document.getElementById('moralText').textContent = data.moral;
+            document.getElementById('view-story-btn').onclick = () => {
+                window.location.href = `/view_story/${storyId}`;
+            };
         }
 
         // Audio handling
