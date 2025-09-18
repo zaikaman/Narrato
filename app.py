@@ -715,8 +715,15 @@ Return ONLY a JSON object in this format, with a list of prompts matching the nu
             
             if len(cleaned_prompts) != len(story_data['paragraphs']):
                 print(f"Warning: Mismatch in number of prompts ({len(cleaned_prompts)}) and paragraphs ({len(story_data['paragraphs'])}).")
-                # Fallback or pad the list
-                return ["A beautiful illustration in digital art style, vibrant colors, detailed"] * len(story_data['paragraphs'])
+                # Pad the list with default prompts to match the paragraph count
+                num_missing = len(story_data['paragraphs']) - len(cleaned_prompts)
+                if num_missing > 0:
+                    print(f"Padding with {num_missing} default prompt(s).")
+                    cleaned_prompts.extend(["A beautiful illustration in digital art style, vibrant colors, detailed"] * num_missing)
+                else:
+                    # If there are more prompts than paragraphs, truncate the extra ones
+                    print(f"Truncating {abs(num_missing)} extra prompt(s).")
+                    cleaned_prompts = cleaned_prompts[:len(story_data['paragraphs'])]
 
             return cleaned_prompts
         except (json.JSONDecodeError, ValueError) as e:
