@@ -936,128 +936,135 @@ def generation_status(task_uuid):
 @app.route('/api/run-worker', methods=['POST'])
 def run_worker():
     """
-    A worker endpoint triggered by a cron job to process one pending story generation task.
-    This endpoint should be secured.
+    A state-machine worker triggered by a cron job. It processes one step of a task at a time.
     """
-    # Simple secret key auth for the cron job
+    # 1. Authenticate the request
     auth_header = request.headers.get('Authorization')
     worker_secret = os.getenv('WORKER_SECRET')
     if not worker_secret or auth_header != f"Bearer {worker_secret}":
         return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-    pending_tasks_response = shov_where('generation_tasks', {'status': 'pending'})
-    pending_tasks = pending_tasks_response.get('items', [])
+    # 2. Select a task to process
+    task_item = None
+    # First, prioritize tasks already in process
+    processing_tasks_response = shov_where('generation_tasks', {'status': 'processing'})
+    if processing_tasks_response.get('items'):
+        task_item = processing_tasks_response['items'][0]
+    else:
+        # If no tasks are processing, pick up a new one
+        pending_tasks_response = shov_where('generation_tasks', {'status': 'pending'})
+        if pending_tasks_response.get('items'):
+            task_item = pending_tasks_response['items'][0]
 
-    if not pending_tasks:
-        return jsonify({"success": True, "message": "No pending tasks."})
+    if not task_item:
+        return jsonify({"success": True, "message": "No tasks to process."})
 
-    task_item = pending_tasks[0]
     task_id = task_item['id']
     task_data = task_item['value']
 
-    print(f"Worker processing task_id: {task_id}")
-    shov_update('generation_tasks', task_id, {"status": "processing", "task_message": "Worker picked up the task."})
+    # 3. Initialize task if it's the first run
+    if task_data.get('status') == 'pending':
+        print(f"Initializing task {task_id}")
+        task_data['status'] = 'processing'
+        task_data['generation_step'] = 'generating_content'
+        task_data['task_message'] = 'Starting story content generation...'
+        task_data['progress'] = 5
+        shov_update('generation_tasks', task_id, task_data)
+
+    # 4. Execute the current step in the state machine
+    current_step = task_data.get('generation_step')
+    print(f"Executing step '{current_step}' for task {task_id}")
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+
     try:
-        final_story_data = loop.run_until_complete(generate_story_background(task_id, task_data))
-        
-        update_payload = {
-            "status": "completed", 
-            "progress": 100, 
-            "task_message": "Story generation complete.", 
-            "result": final_story_data
-        }
-        shov_update('generation_tasks', task_id, update_payload)
-        print(f"Task {task_id} completed successfully.")
+        if current_step == 'generating_content':
+            story_data = loop.run_until_complete(generate_story_content(task_data['prompt'], task_data['min_paragraphs'], task_data['max_paragraphs']))
+            task_data['intermediate_data'] = story_data
+            task_data['generation_step'] = 'generating_elements'
+            task_data['progress'] = 15
+            task_data['task_message'] = 'Analyzing story elements...'
+            shov_update('generation_tasks', task_id, task_data)
+
+        elif current_step == 'generating_elements':
+            story_data = task_data['intermediate_data']
+            style_task = generate_style_guide(story_data)
+            chars_task = analyze_story_characters(story_data)
+            style_data, char_data = loop.run_until_complete(asyncio.gather(style_task, chars_task))
+            story_data['style_guide'] = style_data
+            story_data['character_database'] = char_data if char_data else {"main_characters": [], "supporting_characters": [], "groups": []}
+            task_data['intermediate_data'] = story_data
+            task_data['generation_step'] = 'generating_prompts'
+            task_data['progress'] = 25
+            task_data['task_message'] = 'Generating image prompts...'
+            shov_update('generation_tasks', task_id, task_data)
+
+        elif current_step == 'generating_prompts':
+            story_data = task_data['intermediate_data']
+            image_prompts = loop.run_until_complete(generate_all_image_prompts(story_data))
+            task_data['image_prompts'] = image_prompts # Save prompts to the task
+            task_data['generation_step'] = 'generating_images'
+            task_data['progress'] = 35
+            task_data['task_message'] = 'Generating images...'
+            shov_update('generation_tasks', task_id, task_data)
+
+        elif current_step == 'generating_images':
+            if task_data['image_mode'] == 'generate':
+                image_prompts = task_data['image_prompts']
+                image_tasks = [generate_image(p) for p in image_prompts]
+                image_urls = loop.run_until_complete(asyncio.gather(*image_tasks))
+                image_data = [{'url': url, 'prompt': p} for url, p in zip(image_urls, image_prompts)]
+                story_data = task_data['intermediate_data']
+                story_data['images'] = image_data
+                task_data['intermediate_data'] = story_data
+                task_data['progress'] = 70
+                task_data['task_message'] = f'Generated {len(image_urls)} images'
+            else:
+                task_data['progress'] = 70
+                task_data['task_message'] = 'Skipping image generation'
+            task_data['generation_step'] = 'generating_audio'
+            shov_update('generation_tasks', task_id, task_data)
+
+        elif current_step == 'generating_audio':
+            story_data = task_data['intermediate_data']
+            audio_tasks = [generate_voice(story_data['title'])] + [generate_voice(p) for p in story_data['paragraphs']]
+            audio_files = loop.run_until_complete(asyncio.gather(*audio_tasks))
+            story_data['audio_files'] = audio_files
+            task_data['intermediate_data'] = story_data
+            task_data['generation_step'] = 'saving'
+            task_data['progress'] = 95
+            task_data['task_message'] = 'Finalizing and saving story...'
+            shov_update('generation_tasks', task_id, task_data)
+
+        elif current_step == 'saving':
+            story_data = task_data['intermediate_data']
+            story_data['email'] = task_data['email']
+            story_data['story_uuid'] = str(uuid.uuid4())
+            story_data['public'] = task_data['public']
+            add_response = shov_add('stories', story_data)
+            if not add_response.get('success'):
+                raise Exception(f"Failed to save story to history: {add_response.get('details')}")
+            
+            task_data['status'] = 'completed'
+            task_data['generation_step'] = 'done'
+            task_data['progress'] = 100
+            task_data['task_message'] = 'Story generation complete.'
+            task_data['result'] = story_data
+            shov_update('generation_tasks', task_id, task_data)
 
     except Exception as e:
-        print(f"Worker error for task {task_id}: {e}")
+        print(f"Worker failed on step '{current_step}' for task {task_id}: {e}")
         traceback.print_exc()
-        error_payload = {
-            "status": "failed", 
-            "error": str(e), 
-            "task_message": "An error occurred during generation."
-        }
-        shov_update('generation_tasks', task_id, error_payload)
+        task_data['status'] = 'failed'
+        task_data['error'] = str(e)
+        task_data['task_message'] = f"An error occurred during step: {current_step}"
+        shov_update('generation_tasks', task_id, task_data)
     finally:
         loop.close()
 
-    return jsonify({"success": True, "message": f"Attempted to process task {task_id}."})
+    return jsonify({"success": True, "message": f"Processed step '{current_step}' for task {task_id}."})
 
-
-async def generate_story_background(task_id, task_data):
-    """The background process for generating a full story."""
-    prompt = task_data['prompt']
-    min_paragraphs = task_data['min_paragraphs']
-    max_paragraphs = task_data['max_paragraphs']
-    image_mode = task_data['image_mode']
-    email = task_data['email']
-    public = task_data['public']
-
-    def update_progress(progress, message, data=None):
-        payload = {"progress": progress, "task_message": message}
-        if data:
-            payload["intermediate_data"] = data
-        shov_update('generation_tasks', task_id, payload)
-
-    try:
-        # 1. Generate story content
-        update_progress(5, 'Creating story content...')
-        story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
-        update_progress(10, 'Story content generated', story_data)
-
-        # 2 & 3. Generate style guide and analyze characters
-        update_progress(15, 'Analyzing story elements...')
-        style_task = generate_style_guide(story_data)
-        chars_task = analyze_story_characters(story_data)
-        style_data, char_data = await asyncio.gather(style_task, chars_task)
-        story_data['style_guide'] = style_data
-        story_data['character_database'] = char_data if char_data else {"main_characters": [], "supporting_characters": [], "groups": []}
-        update_progress(20, 'Story elements analyzed', story_data)
-        
-        # 4. Generate image prompts
-        update_progress(25, 'Generating image prompts...')
-        image_prompts = await generate_all_image_prompts(story_data)
-        update_progress(30, f'Generated {len(image_prompts)} prompts')
-
-        # 5. Generate images
-        if image_mode == 'generate':
-            update_progress(35, 'Generating images...')
-            image_tasks = [generate_image(p) for p in image_prompts]
-            image_urls = await asyncio.gather(*image_tasks)
-            image_data = [{'url': url, 'prompt': p} for url, p in zip(image_urls, image_prompts)]
-            story_data['images'] = image_data
-            update_progress(70, f'Generated {len(image_urls)} images')
-        else:
-            story_data['images'] = [{'prompt': p, 'url': None} for p in image_prompts]
-            update_progress(70, 'Skipping image generation')
-
-        # 6. Generate audio files
-        update_progress(75, 'Generating audio files...')
-        audio_tasks = [generate_voice(story_data['title'])] + [generate_voice(p) for p in story_data['paragraphs']]
-        audio_files = await asyncio.gather(*audio_tasks)
-        story_data['audio_files'] = audio_files
-        update_progress(95, f'Generated {len(audio_files)} audio files')
-
-        # Finalize and save to main 'stories' collection
-        story_data['email'] = email
-        story_data['story_uuid'] = str(uuid.uuid4())
-        story_data['public'] = public
-        add_response = shov_add('stories', story_data)
-        if not add_response.get('success'):
-            error_details = add_response.get('details', 'No details provided.')
-            print(f"CRITICAL: Failed to save story to history. Error: {add_response.get('error')}. Details: {error_details}")
-            # Still, we return the data to the user task
-        
-        return story_data
-        
-    except Exception as e:
-        print(f"Error in generate_story_background for task {task_id}: {str(e)}")
-        print(f"Stack trace: {traceback.format_exc()}")
-        # The exception will be caught by the worker, which will update the task status
-        raise
         
 
 
