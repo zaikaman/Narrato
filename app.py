@@ -426,14 +426,6 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         # Remove markdown code blocks
         response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
         
-        # Remove trailing comma after the last element of the array and object
-                # The following regex cleaning has been disabled as it was causing JSON parsing errors.
-        # # Remove trailing comma after the last element of the array and object
-        # response_text = re.sub(r',(\s*[\}\]])', r'\1', response_text)
-        # response_text = re.sub(r',\s*"moral":', r',"moral":', response_text)
-        
-        # Remove extra whitespace and reformat JSON
-        
         print(f"Cleaned response: {response_text}")
         
         try:
@@ -831,7 +823,7 @@ def delete_story():
     story_id = data.get('story_id')
 
     if not story_id:
-        return jsonify({"success": False, "error": "Invalid request: No story ID provided."}), 400
+        return jsonify({"success": False, "error": "Invalid request: No story ID provided."} ), 400
 
     # Verify ownership
     stories_response = shov_where('stories', {'email': session['email']})
@@ -851,7 +843,7 @@ def delete_story():
             return jsonify({"success": False, "error": error_msg}), 500
     else:
         print(f"User is NOT authorized to delete story {story_id}.")
-        return jsonify({"success": False, "error": "You are not authorized to delete this story."}), 403
+        return jsonify({"success": False, "error": "You are not authorized to delete this story."} ), 403
 
 def shov_update(collection_name, item_id, value):
     """Update an item in a collection by its ID."""
@@ -874,12 +866,14 @@ def shov_update(collection_name, item_id, value):
         return {"success": False, "error": "JSONDecodeError", "details": "API returned success status but response was not valid JSON."}
 
 
+# --- Production (Worker) Endpoints ---
+
 @app.route('/start-story-generation', methods=['POST'])
 def start_story_generation():
     """Starts the asynchronous story generation process."""
     data = request.get_json()
     if not data or not data.get('prompt'):
-        return jsonify({"success": False, "error": "Prompt is required."}), 400
+        return jsonify({"success": False, "error": "Prompt is required."} ), 400
 
     prompt = data.get('prompt')
     image_mode = data.get('imageMode', 'generate')
@@ -908,7 +902,7 @@ def start_story_generation():
     add_response = shov_add('generation_tasks', task)
     if not add_response.get('success'):
         print(f"Failed to create generation task: {add_response}")
-        return jsonify({"success": False, "error": "Failed to create generation task."}), 500
+        return jsonify({"success": False, "error": "Failed to create generation task."} ), 500
 
     return jsonify({"success": True, "task_uuid": task_uuid})
 
@@ -961,7 +955,7 @@ def run_worker():
             task_item = pending_tasks_response['items'][0]
 
     if not task_item:
-        return jsonify({"success": True, "message": "No ready tasks to process."})
+        return jsonify({"success": True, "message": "No ready tasks to process."} )
 
     task_id = task_item['id']
     task_data = task_item['value']
@@ -1086,8 +1080,93 @@ def run_worker():
     return jsonify({"success": True, "message": f"Processed step '{current_step}' for task {task_id}."})
 
         
+# --- Local Development (Streaming) Endpoints ---
 
+async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_paragraphs, email, public):
+    """Generate story and stream progress. Used for local development."""
+    
+    def progress_update(task, step, total, data=None):
+        return {"task": task, "progress": step, "total": total, "data": data}
 
+    try:
+        # 1. Generate story content
+        yield progress_update('Creating story content...', 0, 100)
+        story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
+        yield progress_update('Story content generated', 10, 100, story_data)
+
+        # 2 & 3. Generate style guide and analyze characters
+        yield progress_update('Analyzing story elements...', 15, 100)
+        style_task = generate_style_guide(story_data)
+        chars_task = analyze_story_characters(story_data)
+        style_data, char_data = await asyncio.gather(style_task, chars_task)
+        story_data['style_guide'] = style_data
+        story_data['character_database'] = char_data if char_data else {"main_characters": [], "supporting_characters": [], "groups": []}
+        yield progress_update('Story elements analyzed', 25, 100, story_data)
+        
+        # 4. Generate image prompts
+        yield progress_update('Generating image prompts...', 30, 100)
+        image_prompts = await generate_all_image_prompts(story_data)
+        yield progress_update(f'Generated {len(image_prompts)} prompts', 35, 100)
+
+        # 5. Generate images
+        if image_mode == 'generate':
+            yield progress_update('Generating images...', 40, 100)
+            image_tasks = [generate_image(p) for p in image_prompts]
+            image_urls = await asyncio.gather(*image_tasks)
+            image_data = [{'url': url, 'prompt': p} for url, p in zip(image_urls, image_prompts)]
+            story_data['images'] = image_data
+            yield progress_update(f'Generated {len(image_urls)} images', 70, 100)
+        else:
+            story_data['images'] = [{'prompt': p, 'url': None} for p in image_prompts]
+            yield progress_update('Skipping image generation', 70, 100)
+
+        # 6. Generate audio files
+        yield progress_update('Generating audio files...', 75, 100)
+        audio_tasks = [generate_voice(story_data['title'])] + [generate_voice(p) for p in story_data['paragraphs']]
+        audio_files = await asyncio.gather(*audio_tasks)
+        story_data['audio_files'] = audio_files
+        yield progress_update(f'Generated {len(audio_files)} audio files', 95, 100)
+
+        # Finalize
+        story_data['email'] = email
+        story_data['story_uuid'] = str(uuid.uuid4())
+        story_data['public'] = public
+        add_response = shov_add('stories', story_data)
+        if not add_response.get('success'):
+            error_details = add_response.get('details', 'No details provided.')
+            print(f"CRITICAL: Failed to save story to history. Error: {add_response.get('error')}. Details: {error_details}")
+        
+        yield progress_update('Finished!', 100, 100, story_data)
+        
+    except Exception as e:
+        print(f"Error in generate_story_for_stream: {str(e)}")
+        print(f"Stack trace: {traceback.format_exc()}")
+        yield progress_update('Error', 100, 100, {"error": str(e)})
+
+@app.route('/generate_story_stream', methods=['GET'])
+def generate_story_stream():
+    prompt = request.args.get('prompt')
+    image_mode = request.args.get('imageMode', 'generate')
+    public = request.args.get('public') == 'true'
+    min_paragraphs = int(request.args.get('minParagraphs', 15))
+    max_paragraphs = int(request.args.get('maxParagraphs', 20))
+    email = session.get('email')
+
+    def generate():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            gen = generate_story_for_stream(prompt, image_mode, min_paragraphs, max_paragraphs, email, public)
+            while True:
+                try:
+                    progress = loop.run_until_complete(gen.__anext__())
+                    yield f"data: {json.dumps(progress)}\n\n"
+                except StopAsyncIteration:
+                    break
+        finally:
+            loop.close()
+
+    return Response(generate(), mimetype='text/event-stream')
 
 
 from xhtml2pdf import pisa

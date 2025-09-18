@@ -370,4 +370,11 @@ body {
     }
 }
 
-
+.pixel-button:disabled {
+    background-color: #9E9E9E; /* A neutral gray */
+    color: #616161;
+    opacity: 0.7;
+    cursor: not-allowed;
+    box-shadow: 2px 2px #000; /* Less prominent shadow */
+    transform: translate(2px, 2px);
+}
