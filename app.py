@@ -354,7 +354,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         print("Sending story creation request...")
         
         english_story_response = None
-        for i in range(len(api_key_manager.google_keys)): # Retry for each key
+        for i in range(len(api_key_manager.keys)): # Retry for each key
             try:
                 english_story_response = model.generate_content(f'''
         You are a master storyteller writing an engaging and detailed story for a general audience. 
@@ -475,7 +475,7 @@ async def generate_style_guide(story_data):
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         style_guide_response = None
-        for i in range(len(api_key_manager.google_keys)):
+        for i in range(len(api_key_manager.keys)):
             try:
                 style_guide_response = model.generate_content(f'''
         Create a consistent art style guide for this story. Read the title and first few paragraphs:
@@ -529,7 +529,7 @@ async def analyze_story_characters(story_data):
     try:
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
-        for i in range(len(api_key_manager.google_keys)): # Retry for each key
+        for i in range(len(api_key_manager.keys)): # Retry for each key
             try:
                 character_analysis = model.generate_content(f'''
         You are a character designer creating consistent descriptions for all characters in this story. 
@@ -687,7 +687,7 @@ Return ONLY a JSON object in this format, with a list of prompts matching the nu
         }
 
         image_prompts_response = None
-        for i in range(len(api_key_manager.google_keys)): # Retry for each key
+        for i in range(len(api_key_manager.keys)): # Retry for each key
             try:
                 image_prompts_response = model.generate_content(prompt_for_gemini, safety_settings=safety_settings)
                 break # Success
