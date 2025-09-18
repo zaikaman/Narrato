@@ -178,13 +178,7 @@ class APIKeyManager:
 # Initialize API key manager
 api_key_manager = APIKeyManager()
 
-import requests
 
-url = "https://github.com/dejavu-fonts/dejavu-fonts/blob/main/ttf/DejaVuSans.ttf?raw=true"
-response = requests.get(url)
-
-with open("static/DejaVuSans.ttf", "wb") as f:
-    f.write(response.content)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
