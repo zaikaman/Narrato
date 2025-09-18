@@ -859,8 +859,8 @@ def shov_update(collection_name, item_id, value):
         "Authorization": f"Bearer {SHOV_API_KEY}",
         "Content-Type": "application/json"
     }
-    data = {"name": collection_name, "value": value}
-    print(f"--- Shov Update --- PRE-REQUEST: Updating {item_id} in {collection_name}")
+    data = {"collection": collection_name, "value": value}
+    print(f"--- Shov Update --- PRE-REQUEST: Updating {item_id} in {collection_name} with {data}")
     try:
         response = requests.post(f"{SHOV_API_URL}/update/{PROJECT_NAME}/{item_id}", headers=headers, json=data)
         print(f"--- Shov Update --- POST-REQUEST: Status Code: {response.status_code}")
@@ -956,7 +956,7 @@ def run_worker():
     task_data = task_item['value']
 
     print(f"Worker processing task_id: {task_id}")
-    shov_update('generation_tasks', task_id, {"value": {"status": "processing", "task_message": "Worker picked up the task."}})
+    shov_update('generation_tasks', task_id, {"status": "processing", "task_message": "Worker picked up the task."})
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -969,7 +969,7 @@ def run_worker():
             "task_message": "Story generation complete.", 
             "result": final_story_data
         }
-        shov_update('generation_tasks', task_id, {"value": update_payload})
+        shov_update('generation_tasks', task_id, update_payload)
         print(f"Task {task_id} completed successfully.")
 
     except Exception as e:
@@ -980,7 +980,7 @@ def run_worker():
             "error": str(e), 
             "task_message": "An error occurred during generation."
         }
-        shov_update('generation_tasks', task_id, {"value": error_payload})
+        shov_update('generation_tasks', task_id, error_payload)
     finally:
         loop.close()
 
@@ -1000,7 +1000,7 @@ async def generate_story_background(task_id, task_data):
         payload = {"progress": progress, "task_message": message}
         if data:
             payload["intermediate_data"] = data
-        shov_update('generation_tasks', task_id, {"value": payload})
+        shov_update('generation_tasks', task_id, payload)
 
     try:
         # 1. Generate story content
