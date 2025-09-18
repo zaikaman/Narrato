@@ -23,7 +23,6 @@ from google.api_core import exceptions
 
 load_dotenv()
 
-
 # Shov.com configuration
 SHOV_API_KEY = os.getenv("SHOV_API_KEY")
 PROJECT_NAME = os.getenv("SHOV_PROJECT", "narrato")
