@@ -1,4 +1,3 @@
-
 from urllib.parse import unquote
 import cloudinary
 import cloudinary.uploader
@@ -113,9 +112,10 @@ def shov_remove(collection_name, item_id):
     """Remove an item from a collection by its ID, with robust error handling."""
     try:
         headers = {
-            "Authorization": f"Bearer {SHOV_API_KEY}"
+            "Authorization": f"Bearer {SHOV_API_KEY}",
+            "Content-Type": "application/json"
         }
-        data = {"name": collection_name}
+        data = {"collection": collection_name}
         print(f"--- Shov Remove --- PRE-REQUEST: Deleting {item_id} from {collection_name}")
         response = requests.post(f"{SHOV_API_URL}/remove/{PROJECT_NAME}/{item_id}", headers=headers, json=data)
         
@@ -427,11 +427,13 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
         
         # Remove trailing comma after the last element of the array and object
-        response_text = re.sub(r',(\s*[\}\]])', r'\1', response_text)
-        response_text = re.sub(r',\s*"moral":', r',"moral":', response_text)
+                # The following regex cleaning has been disabled as it was causing JSON parsing errors.
+        # # Remove trailing comma after the last element of the array and object
+        # response_text = re.sub(r',(\s*[\}\]])', r'\1', response_text)
+        # response_text = re.sub(r',\s*"moral":', r',"moral":', response_text)
         
         # Remove extra whitespace and reformat JSON
-        response_text = re.sub(r'\s+', ' ', response_text)
+        
         print(f"Cleaned response: {response_text}")
         
         try:
@@ -479,6 +481,63 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         print(f"Stack trace: {traceback.format_exc()}")
         print("=== Finished generate_story_content with exception ===\n")
         raise
+
+async def generate_style_guide(story_data):
+    """Generate a consistent art style guide for the story."""
+    try:
+        api_key = await api_key_manager.get_next_key()
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        style_guide_response = None
+        for i in range(len(api_key_manager.google_keys)):
+            try:
+                style_guide_response = model.generate_content(f'''
+        Create a consistent art style guide for this story. Read the title and first few paragraphs:
+        Title: {story_data['title']}
+        Story start: {' '.join(story_data['paragraphs'][:5])}
+
+        Return ONLY a JSON object in this format, no other text:
+        {{
+            "art_style": {{
+                "overall_style": "Main art style description",
+                "color_palette": "Specific color scheme to use throughout",
+                "lighting": "Consistent lighting approach",
+                "composition": "Standard composition guidelines",
+                "texture": "Texture treatment across all images",
+                "perspective": "How scenes should be framed"
+            }}
+        }}
+        ''' )
+                break
+            except exceptions.ResourceExhausted as e:
+                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
+                api_key = await api_key_manager.get_next_key()
+                genai.configure(api_key=api_key)
+                print("Switched to new API key.")
+
+        if not style_guide_response:
+            raise Exception("Failed to generate style guide after multiple retries.") 
+        
+        style_text = style_guide_response.text.strip()
+        style_text = re.sub(r'```(?:json)?\s*|\s*```', '', style_text)
+        style_data = json.loads(style_text)
+        if not style_data.get('art_style'):
+            raise ValueError("Missing art_style in response")
+        return style_data
+        
+    except Exception as e:
+        print(f"Error generating style guide: {e}")
+        return {
+            "art_style": {
+                "overall_style": "Digital art style with realistic details",
+                "color_palette": "Rich, vibrant colors with deep contrasts",
+                "lighting": "Dramatic lighting with strong highlights and shadows",
+                "composition": "Dynamic, cinematic compositions",
+                "texture": "Detailed textures with fine grain",
+                "perspective": "Varied angles to enhance dramatic effect"
+            }
+        }
 
 async def analyze_story_characters(story_data):
     """Analyze and create consistent descriptions for all characters in the story"""
@@ -559,8 +618,6 @@ async def analyze_story_characters(story_data):
             if not (char_data.get('main_characters') or char_data.get('supporting_characters')):
                 raise ValueError("Missing character data in response")
                 
-            # Add to story_data
-            story_data['character_database'] = char_data
             print("Successfully created character database")
             return char_data
             
@@ -573,100 +630,22 @@ async def analyze_story_characters(story_data):
         print(f"Error in analyze_story_characters: {str(e)}")
         return None
 
-async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, previous_prompts=None):
-    """Create a prompt for the image using Gemini, with character information to keep it consistent"""
+async def generate_all_image_prompts(story_data):
+    """Create all image prompts for the story using Gemini, ensuring consistency."""
     try:
-        # Get the next API key in a round-robin fashion
         api_key = await api_key_manager.get_next_key()
         genai.configure(api_key=api_key)
-        print(f"Using new API key for generate_image_prompt")
+        print("Using new API key for generate_all_image_prompts")
         
         model = genai.GenerativeModel('gemini-2.5-flash')
         
-        # Get prompt history from story_data
-        previous_prompts = story_data.get('previous_prompts', []) if story_data else []
-        
-        # Create context from prompt history
-        prompt_history_context = ""
-        if previous_prompts:
-            prompt_history_context = f"""
-            Previous image prompts for consistency (numbered in sequence):
-            {chr(10).join(f'{i+1}. {prompt}' for i, prompt in enumerate(previous_prompts))}
-            """
-
-        # Analyze the paragraph to identify which characters appear
-        character_mention_analysis = None
-        for i in range(len(api_key_manager.google_keys)): # Retry for each key
-            try:
-                character_mention_analysis = model.generate_content(f"""
-        Analyze this paragraph and identify which characters appear in it.
-        Also identify their emotional state or any significant changes in appearance.
-        
-        Paragraph: "{paragraph}"
-
-        Return ONLY a JSON object in this format:
-        {{
-            "characters": [
-                {{
-                    "name": "Character name or identifier",
-                    "emotional_state": ["happy", "excited"],
-                    "appearance_change": "Any story-driven changes to note"
-                }}
-            ]
-        }}
-        """ )
-                break # Success
-            except exceptions.ResourceExhausted as e:
-                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
-                api_key = await api_key_manager.get_next_key()
-                genai.configure(api_key=api_key)
-                print("Switched to new API key.")
-        
-        if not character_mention_analysis:
-            print("Failed to generate character mention analysis after multiple retries.")
-            mentioned_chars = []
-        else:
-            try:
-                char_mentions = json.loads(character_mention_analysis.text)
-                mentioned_chars = char_mentions.get('characters', [])
-            except:
-                mentioned_chars = []
-
-        # Get character information from the character_database
-        character_descriptions = []
         char_db = story_data.get('character_database', {})
-        
-        # Build a character description based on emotional state and changes
-        for mention in mentioned_chars:
-            char_name = mention.get('name')
-            char_data, char_type = find_character(char_name, char_db)
-            
-            if char_data:
-                description = char_data.get('base_description', '')
-                
-                # Add an expression based on the emotional state
-                emotions = mention.get('emotional_state', [])
-                for variation in char_data.get('variations', []):
-                    if any(emotion in variation['trigger_keywords'] for emotion in emotions):
-                        description = f"{description}, {variation['expression_override']}"
-                
-                # Add appearance changes if any
-                appearance_change = mention.get('appearance_change')
-                if appearance_change:
-                    for dev_point in char_data.get('development_points', []):
-                        if appearance_change.lower() in dev_point['story_point'].lower():
-                            description = f"{description}, {dev_point['appearance_change']}"
-                
-                character_descriptions.append(description)
-
-        character_context = "Character descriptions (MUST be followed exactly):\n" + "\n\n".join(character_descriptions) if character_descriptions else ""
-
-        style_data = story_data.get('style_guide') if story_data else None
+        style_data = story_data.get('style_guide')
         style_context = ""
         
         if style_data:
             art_style = style_data.get('art_style', {})
-            style_context = f"""
+            style_context = f'''
             Art style requirements (MUST follow exactly):
             - Style: {art_style.get('overall_style', '')}
             - Colors: {art_style.get('color_palette', '')}
@@ -674,37 +653,51 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
             - Composition: {art_style.get('composition', '')}
             - Texture: {art_style.get('texture', '')}
             - Perspective: {art_style.get('perspective', '')}
-            """
-            
-        # Create a prompt with the full character description and prompt history
-        image_prompt_response = None
+            '''
+
+        paragraphs_json = json.dumps(story_data['paragraphs'], indent=2)
+
+        prompt_for_gemini = f'''
+You are a visual artist creating prompts for an AI image generator. 
+Your task is to create a detailed image generation prompt for EACH paragraph in the story provided, while maintaining STRICT character and style consistency across all images.
+
+**Story Paragraphs:**
+{paragraphs_json}
+
+**Instructions:**
+1.  **Analyze Characters and Scenes:** For each paragraph, identify the characters, their emotional state, and the scene.
+2.  **Apply Consistent Descriptions:** Use the provided Character Database to ensure characters look the same in every image. Apply `expression_override` or `appearance_change` based on the context of each paragraph.
+3.  **Construct Prompts:** Create a list of detailed image prompts, one for each paragraph. Each prompt must:
+    - Start with the EXACT, combined character descriptions for that scene.
+    - Describe the scene/action from the paragraph.
+    - Adhere to the Art Style Guide.
+    - Be between 75-100 words.
+    - Follow the format: [character descriptions], [scene/action description], [art style], [mood], [lighting].
+4.  **Ensure Consistency:** The prompts should tell a cohesive visual story, with consistent characters and environments.
+
+**Provided Information:**
+
+**1. Character Database:**
+{json.dumps(char_db, indent=2)}
+
+**2. Art Style Guide:**
+{style_context}
+
+**Final Output:**
+Return ONLY a JSON object in this format, with a list of prompts matching the number of paragraphs.
+{{
+    "image_prompts": [
+        "The final, detailed image prompt for paragraph 1.",
+        "The final, detailed image prompt for paragraph 2.",
+        ...
+    ]
+}}
+'''
+        
+        image_prompts_response = None
         for i in range(len(api_key_manager.google_keys)): # Retry for each key
             try:
-                image_prompt_response = model.generate_content(f"""
-        You are a visual artist creating prompts for an AI image generator.
-        Create a detailed image generation prompt for this story paragraph while maintaining STRICT character and style consistency.
-
-        Story paragraph: "{paragraph}"
-
-        {character_context}
-
-        {style_context}
-
-        {prompt_history_context}
-
-        Requirements:
-        1. Start with the EXACT character descriptions provided above for any character in the scene
-        2. Then describe the scene/action while maintaining those character details
-        3. Follow the art style guide exactly for colors, lighting, and composition
-        4. Format: [character descriptions], [scene/action description], [art style], [mood], [lighting]
-        5. Keep prompt length between 75-100 words
-        6. Use exact same descriptors for recurring character features
-        7. NEVER change or contradict the provided character descriptions
-        8. Maintain consistency with previous prompts - use same descriptors and style
-        9. If a character appeared in previous prompts, use the SAME physical description
-        
-        Return ONLY the prompt, no additional text or explanations.
-        """ )
+                image_prompts_response = model.generate_content(prompt_for_gemini)
                 break # Success
             except exceptions.ResourceExhausted as e:
                 print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
@@ -712,22 +705,34 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
                 genai.configure(api_key=api_key)
                 print("Switched to new API key.")
         
-        if not image_prompt_response:
-            print("Failed to generate image prompt after multiple retries.")
-            return "A beautiful illustration in digital art style, vibrant colors, detailed"
+        if not image_prompts_response:
+            print("Failed to generate image prompts after multiple retries.")
+            return ["A beautiful illustration in digital art style, vibrant colors, detailed"] * len(story_data['paragraphs'])
         
-        prompt = image_prompt_response.text.strip()
-        # Remove quotes and special characters
-        prompt = re.sub(r'["\'\n]', '', prompt)
-        
-        # Save prompt to history
-        if story_data and 'previous_prompts' in story_data:
-            story_data['previous_prompts'].append(prompt)
-        
-        return prompt
+        try:
+            response_text = image_prompts_response.text.strip()
+            response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
+            prompts_data = json.loads(response_text)
+            prompts = prompts_data.get("image_prompts", [])
+            
+            # Clean up each prompt
+            cleaned_prompts = [re.sub(r'["\'\n]', '', p) for p in prompts]
+            
+            if len(cleaned_prompts) != len(story_data['paragraphs']):
+                print(f"Warning: Mismatch in number of prompts ({len(cleaned_prompts)}) and paragraphs ({len(story_data['paragraphs'])}).")
+                # Fallback or pad the list
+                return ["A beautiful illustration in digital art style, vibrant colors, detailed"] * len(story_data['paragraphs'])
+
+            return cleaned_prompts
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Could not parse image prompts JSON: {e}")
+            print(f"Raw response: {image_prompts_response.text}")
+            return ["A beautiful illustration in digital art style, vibrant colors, detailed"] * len(story_data['paragraphs'])
+
     except Exception as e:
-        print(f"Generate image prompt error: {str(e)}")
-        return "A beautiful illustration in digital art style, vibrant colors, detailed"
+        print(f"Generate all image prompts error: {str(e)}")
+        return ["A beautiful illustration in digital art style, vibrant colors, detailed"] * len(story_data['paragraphs'])
+
 
 @app.route('/')
 def index():
@@ -888,115 +893,52 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
         # 1. Generate story content
         yield progress_update('Creating story content...', 0, 100)
         story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
-        story_data['previous_prompts'] = []  # Initialize a list to save the prompt history
         yield progress_update('Story content generated', 10, 100, story_data)
         num_paragraphs = len(story_data['paragraphs'])
 
-        # 2. Create style guide
-        yield progress_update('Generating style guide...', 10, 100)
-        api_key = await api_key_manager.get_next_key()
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        # 2 & 3. Generate style guide and analyze characters in parallel
+        yield progress_update('Analyzing story elements...', 10, 100)
         
-        style_guide = None
-        for i in range(len(api_key_manager.google_keys)):
-            try:
-                style_guide = model.generate_content(f'''
-        Create a consistent art style guide for this story. Read the title and first few paragraphs:
-        Title: {story_data['title']}
-        Story start: {' '.join(story_data['paragraphs'][:5])}
-
-        Return ONLY a JSON object in this format, no other text:
-        {{
-            "art_style": {{
-                "overall_style": "Main art style description",
-                "color_palette": "Specific color scheme to use throughout",
-                "lighting": "Consistent lighting approach",
-                "composition": "Standard composition guidelines",
-                "texture": "Texture treatment across all images",
-                "perspective": "How scenes should be framed"
-            }}
-        }}
-        ''' )
-                break
-            except exceptions.ResourceExhausted as e:
-                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
-                api_key = await api_key_manager.get_next_key()
-                genai.configure(api_key=api_key)
-                print("Switched to new API key.")
-
-        if not style_guide:
-            raise Exception("Failed to generate style guide after multiple retries.") 
+        style_task = generate_style_guide(story_data)
+        chars_task = analyze_story_characters(story_data)
         
-        try:
-            style_text = style_guide.text.strip()
-            style_text = re.sub(r'```(?:json)?\s*|\s*```', '', style_text)
-            style_data = json.loads(style_text)
-            if not style_data.get('art_style'):
-                raise ValueError("Missing art_style in response")
-            story_data['style_guide'] = style_data
-        except Exception as e:
-            story_data['style_guide'] = {
-                "art_style": {
-                    "overall_style": "Digital art style with realistic details",
-                    "color_palette": "Rich, vibrant colors with deep contrasts",
-                    "lighting": "Dramatic lighting with strong highlights and shadows",
-                    "composition": "Dynamic, cinematic compositions",
-                    "texture": "Detailed textures with fine grain",
-                    "perspective": "Varied angles to enhance dramatic effect"
-                }
-            }
-        yield progress_update('Style guide created', 15, 100, story_data)
+        style_data, char_data = await asyncio.gather(style_task, chars_task)
 
-        # 3. Analyze and create character database
-        yield progress_update('Analyzing characters...', 15, 100)
-        char_data = await analyze_story_characters(story_data)
-        if not char_data:
-            story_data['character_database'] = {
-                "main_characters": [],
-                "supporting_characters": [],
-                "groups": []
-            }
-        yield progress_update('Characters analyzed', 20, 100, story_data)
+        story_data['style_guide'] = style_data
+        story_data['character_database'] = char_data if char_data else {
+            "main_characters": [],
+            "supporting_characters": [],
+            "groups": []
+        }
+        
+        yield progress_update('Story elements analyzed', 20, 100, story_data)
         
         # 4. Generate image prompts
         yield progress_update('Generating image prompts...', 20, 100)
-        image_prompts = []
-        for i, paragraph in enumerate(story_data['paragraphs']):
-            prompt = await generate_image_prompt(paragraph, story_data, i)
-            image_prompts.append(prompt)
-            progress = 20 + int(10 * (i + 1) / num_paragraphs)
-            yield progress_update(f'Generated prompt {i+1}/{num_paragraphs}', progress, 100)
+        image_prompts = await generate_all_image_prompts(story_data)
+        progress = 30
+        yield progress_update(f'Generated {len(image_prompts)} prompts', progress, 100)
 
         # 5. Generate images
         if image_mode == 'generate':
             yield progress_update('Generating images...', 30, 100)
-            image_data = []
-            for i, prompt in enumerate(image_prompts):
-                image_url = await generate_image(prompt)
-                image_data.append({'url': image_url, 'prompt': prompt})
-                progress = 30 + int(40 * (i + 1) / num_paragraphs)
-                yield progress_update(f'Generating image {i+1}/{num_paragraphs}...', progress, 100)
+            image_tasks = [generate_image(prompt) for prompt in image_prompts]
+            image_urls = await asyncio.gather(*image_tasks)
+            image_data = [{'url': url, 'prompt': prompt} for url, prompt in zip(image_urls, image_prompts)]
             story_data['images'] = image_data
+            progress = 70
+            yield progress_update(f'Generated {len(image_urls)} images', progress, 100)
         else:
             story_data['images'] = [{'prompt': prompt, 'url': None} for prompt in image_prompts]
             yield progress_update('Skipping image generation', 70, 100)
 
         # 6. Generate audio files
         yield progress_update('Generating audio files...', 70, 100)
-        audio_files = []
-        title_audio_url = await generate_voice(story_data['title'])
-        audio_files.append(title_audio_url)
-        progress = 70 + int(30 * 1 / (num_paragraphs + 1))
-        yield progress_update(f'Generated audio 1/{num_paragraphs + 1}', progress, 100)
-
-        for i, paragraph in enumerate(story_data['paragraphs']):
-            audio_url = await generate_voice(paragraph)
-            audio_files.append(audio_url)
-            progress = 70 + int(30 * (i + 2) / (num_paragraphs + 1))
-            yield progress_update(f'Generated audio {i+2}/{num_paragraphs + 1}', progress, 100)
-        
+        audio_tasks = [generate_voice(story_data['title'])] + [generate_voice(p) for p in story_data['paragraphs']]
+        audio_files = await asyncio.gather(*audio_tasks)
         story_data['audio_files'] = audio_files
+        progress = 95
+        yield progress_update(f'Generated {len(audio_files)} audio files', progress, 100)
 
         # Finalize
         story_data['email'] = email
@@ -1012,8 +954,7 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
     except Exception as e:
         print(f"Error in generate_story endpoint: {str(e)}")
         print(f"Stack trace: {traceback.format_exc()}")
-        yield progress_update('Error', 100, 100, {"error": str(e)})
-
+        yield progress_update('Error', 100, 100, {"error": str(e)})        
 
 
 
