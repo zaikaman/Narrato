@@ -123,9 +123,13 @@ function startPolling(taskUUID) {
     const pollInterval = setInterval(async () => {
         try {
             const statusResponse = await fetch(`/generation-status/${taskUUID}`);
+            if (!statusResponse.ok) {
+                throw new Error(`Server error: ${statusResponse.status}`);
+            }
             const statusData = await statusResponse.json();
 
             if (!statusData.success) {
+                // Handle cases where the task is explicitly not found by the server
                 if (statusData.error === 'Task not found') {
                     alert('The story task you were tracking could not be found. It may have been completed or expired.');
                     localStorage.removeItem('activeTaskUUID');
@@ -150,6 +154,7 @@ function startPolling(taskUUID) {
                 updateTaskStatus('task3', 'completed');
             }
 
+            // Handle permanent completion or failure reported by the server
             if (statusData.status === 'completed' || statusData.status === 'failed') {
                 clearInterval(pollInterval);
                 localStorage.removeItem('activeTaskUUID');
@@ -162,19 +167,15 @@ function startPolling(taskUUID) {
                     document.getElementById('loading').classList.add('hidden');
                     if (window.stopGame) stopGame();
                     document.getElementById('game-container').classList.add('hidden');
-                } else {
-                    throw new Error(statusData.error || 'Story generation failed.');
+                } else { // The task has permanently failed
+                    alert(statusData.error || 'Story generation failed.');
+                    window.location.reload(); // Reload to show the form again
                 }
             }
         } catch (pollError) {
-            clearInterval(pollInterval);
-            localStorage.removeItem('activeTaskUUID');
-            console.error("Polling failed:", pollError);
-            alert(pollError.message);
-            updateTaskStatus('task1', 'error');
-            updateTaskStatus('task2', 'error');
-            updateTaskStatus('task3', 'error');
-            document.getElementById('loading').classList.add('hidden');
+            // This catch block now only handles temporary network errors
+            console.error("Polling network error (will retry):", pollError.message);
+            document.getElementById('currentTask').textContent = 'Connection issue. Retrying...';
         }
     }, 3000);
 }

@@ -936,7 +936,7 @@ def generation_status(task_uuid):
 @app.route('/api/run-worker', methods=['POST'])
 def run_worker():
     """
-    A state-machine worker triggered by a cron job. It processes one step of a task at a time.
+    A state-machine worker with a locking mechanism to prevent race conditions.
     """
     # 1. Authenticate the request
     auth_header = request.headers.get('Authorization')
@@ -944,43 +944,45 @@ def run_worker():
     if not worker_secret or auth_header != f"Bearer {worker_secret}":
         return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-    # 2. Select a task to process
+    # 2. Select a single, unlocked task to process
     task_item = None
-    # First, prioritize tasks already in process
+    # First, find tasks that are already processing but not locked (not in an _inprogress step)
     processing_tasks_response = shov_where('generation_tasks', {'status': 'processing'})
     if processing_tasks_response.get('items'):
-        task_item = processing_tasks_response['items'][0]
-    else:
-        # If no tasks are processing, pick up a new one
+        for item in processing_tasks_response['items']:
+            if not item.get('value', {}).get('generation_step', '').endswith('_inprogress'):
+                task_item = item
+                break
+    
+    # If no processing task is ready, find a new pending task
+    if not task_item:
         pending_tasks_response = shov_where('generation_tasks', {'status': 'pending'})
         if pending_tasks_response.get('items'):
             task_item = pending_tasks_response['items'][0]
 
     if not task_item:
-        return jsonify({"success": True, "message": "No tasks to process."})
+        return jsonify({"success": True, "message": "No ready tasks to process."})
 
     task_id = task_item['id']
     task_data = task_item['value']
 
-    # 3. Initialize task if it's the first run
-    if task_data.get('status') == 'pending':
-        print(f"Initializing task {task_id}")
-        task_data['status'] = 'processing'
-        task_data['generation_step'] = 'generating_content'
-        task_data['task_message'] = 'Starting story content generation...'
-        task_data['progress'] = 5
-        shov_update('generation_tasks', task_id, task_data)
-
-    # 4. Execute the current step in the state machine
-    current_step = task_data.get('generation_step')
-    print(f"Executing step '{current_step}' for task {task_id}")
+    # 3. Get the current step, defaulting to 'start' for pending tasks
+    current_step = 'start' if task_data.get('status') == 'pending' else task_data.get('generation_step')
+    print(f"Found task {task_id} at step '{current_step}'")
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:
-        if current_step == 'generating_content':
+        if current_step == 'start':
+            task_data['status'] = 'processing'
+            task_data['generation_step'] = 'generating_content_inprogress'
+            task_data['task_message'] = 'Generating story content...'
+            task_data['progress'] = 5
+            shov_update('generation_tasks', task_id, task_data)
+            
             story_data = loop.run_until_complete(generate_story_content(task_data['prompt'], task_data['min_paragraphs'], task_data['max_paragraphs']))
+            
             task_data['intermediate_data'] = story_data
             task_data['generation_step'] = 'generating_elements'
             task_data['progress'] = 15
@@ -988,12 +990,16 @@ def run_worker():
             shov_update('generation_tasks', task_id, task_data)
 
         elif current_step == 'generating_elements':
+            task_data['generation_step'] = 'generating_elements_inprogress'
+            shov_update('generation_tasks', task_id, task_data)
+
             story_data = task_data['intermediate_data']
             style_task = generate_style_guide(story_data)
             chars_task = analyze_story_characters(story_data)
             style_data, char_data = loop.run_until_complete(asyncio.gather(style_task, chars_task))
             story_data['style_guide'] = style_data
             story_data['character_database'] = char_data if char_data else {"main_characters": [], "supporting_characters": [], "groups": []}
+            
             task_data['intermediate_data'] = story_data
             task_data['generation_step'] = 'generating_prompts'
             task_data['progress'] = 25
@@ -1001,15 +1007,22 @@ def run_worker():
             shov_update('generation_tasks', task_id, task_data)
 
         elif current_step == 'generating_prompts':
+            task_data['generation_step'] = 'generating_prompts_inprogress'
+            shov_update('generation_tasks', task_id, task_data)
+
             story_data = task_data['intermediate_data']
             image_prompts = loop.run_until_complete(generate_all_image_prompts(story_data))
-            task_data['image_prompts'] = image_prompts # Save prompts to the task
+            
+            task_data['image_prompts'] = image_prompts
             task_data['generation_step'] = 'generating_images'
             task_data['progress'] = 35
             task_data['task_message'] = 'Generating images...'
             shov_update('generation_tasks', task_id, task_data)
 
         elif current_step == 'generating_images':
+            task_data['generation_step'] = 'generating_images_inprogress'
+            shov_update('generation_tasks', task_id, task_data)
+
             if task_data['image_mode'] == 'generate':
                 image_prompts = task_data['image_prompts']
                 image_tasks = [generate_image(p) for p in image_prompts]
@@ -1018,19 +1031,23 @@ def run_worker():
                 story_data = task_data['intermediate_data']
                 story_data['images'] = image_data
                 task_data['intermediate_data'] = story_data
-                task_data['progress'] = 70
                 task_data['task_message'] = f'Generated {len(image_urls)} images'
             else:
-                task_data['progress'] = 70
                 task_data['task_message'] = 'Skipping image generation'
+            
             task_data['generation_step'] = 'generating_audio'
+            task_data['progress'] = 70
             shov_update('generation_tasks', task_id, task_data)
 
         elif current_step == 'generating_audio':
+            task_data['generation_step'] = 'generating_audio_inprogress'
+            shov_update('generation_tasks', task_id, task_data)
+
             story_data = task_data['intermediate_data']
             audio_tasks = [generate_voice(story_data['title'])] + [generate_voice(p) for p in story_data['paragraphs']]
             audio_files = loop.run_until_complete(asyncio.gather(*audio_tasks))
             story_data['audio_files'] = audio_files
+            
             task_data['intermediate_data'] = story_data
             task_data['generation_step'] = 'saving'
             task_data['progress'] = 95
@@ -1038,6 +1055,9 @@ def run_worker():
             shov_update('generation_tasks', task_id, task_data)
 
         elif current_step == 'saving':
+            task_data['generation_step'] = 'saving_inprogress'
+            shov_update('generation_tasks', task_id, task_data)
+
             story_data = task_data['intermediate_data']
             story_data['email'] = task_data['email']
             story_data['story_uuid'] = str(uuid.uuid4())
