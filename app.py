@@ -357,7 +357,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         genai.configure(api_key=api_key)
         print("Initialized Gemini model with new API key")
         
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
         print("Sending story creation request...")
         
         english_story_response = None
@@ -479,7 +479,7 @@ async def generate_style_guide(story_data):
     try:
         api_key = await api_key_manager.get_next_key()
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         style_guide_response = None
         for i in range(len(api_key_manager.google_keys)):
@@ -534,7 +534,7 @@ async def generate_style_guide(story_data):
 async def analyze_story_characters(story_data):
     """Analyze and create consistent descriptions for all characters in the story"""
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         for i in range(len(api_key_manager.google_keys)): # Retry for each key
             try:
@@ -629,7 +629,7 @@ async def generate_all_image_prompts(story_data):
         genai.configure(api_key=api_key)
         print("Using new API key for generate_all_image_prompts")
         
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         char_db = story_data.get('character_database', {})
         style_data = story_data.get('style_guide')
@@ -704,6 +704,11 @@ Return ONLY a JSON object in this format, with a list of prompts matching the nu
         try:
             response_text = image_prompts_response.text.strip()
             response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
+            
+            # Remove trailing commas before closing brackets and braces
+            response_text = re.sub(r',(\s*\])', r'\1', response_text)
+            response_text = re.sub(r',(\s*\})', r'\1', response_text)
+            
             prompts_data = json.loads(response_text)
             prompts = prompts_data.get("image_prompts", [])
             

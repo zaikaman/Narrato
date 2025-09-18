@@ -9,3 +9,4 @@ aiohttp
 cloudinary
 speechify-api
 xhtml2pdf
+gunicorn
