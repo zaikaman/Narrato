@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleScreen = document.getElementById('title-screen');
     const storybook = document.getElementById('storybook');
     const pageContainer = document.getElementById('page-container');
+    const pageNumberDisplay = document.getElementById('page-number');
     const prevBtn = document.getElementById('prev-btn');
     const nextBtn = document.getElementById('next-btn');
     const audioPlayer = document.getElementById('audio-player');
@@ -92,6 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             nextBtn.classList.remove('hidden');
         }
+
+        pageNumberDisplay.textContent = `${pageNumber + 1} / ${pages.length}`;
     }
 
     nextBtn.addEventListener('click', () => {

@@ -162,7 +162,6 @@ body {
     bottom: 8px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 1;
     display: flex;
     gap: 10px;
 }
@@ -202,6 +201,9 @@ body {
     opacity: 1;
 }
 
+.back-button-mobile {
+    display: none;
+}
 
 
 @media (max-width: 800px) {
@@ -240,4 +242,11 @@ body {
 
 }
 
-
+#page-number {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.2em;
+    text-shadow: 2px 2px #000;
+}

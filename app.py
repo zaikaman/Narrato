@@ -21,6 +21,8 @@ import base64
 import json
 from google.api_core import exceptions
 
+load_dotenv()
+
 
 # Shov.com configuration
 SHOV_API_KEY = os.getenv("SHOV_API_KEY")
@@ -178,7 +180,6 @@ speechify_api_key_manager = APIKeyManager(speechify_keys)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
-load_dotenv()
 
 cloudinary.config(
     cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"),
