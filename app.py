@@ -205,10 +205,8 @@ def login_required(f):
 # Configure API keys
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 SPEECHIFY_KEY = os.getenv('SPEECHIFY_KEY')
-FAL_KEY = os.getenv('FAL_KEY')
 
 genai.configure(api_key=GOOGLE_API_KEY)
-os.environ["FAL_KEY"] = FAL_KEY
 speechify_client = AsyncSpeechify(token=SPEECHIFY_KEY)
 speechify_sync_client = Speechify(token=SPEECHIFY_KEY)
 
