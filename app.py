@@ -139,34 +139,25 @@ def shov_remove(collection_name, item_id):
 
 class APIKeyManager:
     """Manages and rotates API keys"""
-    def __init__(self):
-        self.google_keys = [
-            os.getenv('GOOGLE_API_KEY'),
-            os.getenv('GOOGLE_API_KEY_2'),
-            os.getenv('GOOGLE_API_KEY_3'),
-            os.getenv('GOOGLE_API_KEY_4'),
-            os.getenv('GOOGLE_API_KEY_5'),
-            os.getenv('GOOGLE_API_KEY_6'),
-            os.getenv('GOOGLE_API_KEY_7'),
-            os.getenv('GOOGLE_API_KEY_8'),
-            os.getenv('GOOGLE_API_KEY_9'),
-            os.getenv('GOOGLE_API_KEY_10')
-        ]
+    def __init__(self, keys):
+        self.keys = [key for key in keys if key] # Filter out empty keys
+        if not self.keys:
+            raise ValueError("APIKeyManager initialized with no keys.")
         self.current_key_index = 0
-        self.key_usage = {key: 0 for key in self.google_keys}
+        self.key_usage = {key: 0 for key in self.keys}
         self._lock = asyncio.Lock()
     
     async def get_next_key(self):
         """Gets the next API key in a round-robin fashion"""
         async with self._lock:
-            self.current_key_index = (self.current_key_index + 1) % len(self.google_keys)
-            key = self.google_keys[self.current_key_index]
+            self.current_key_index = (self.current_key_index + 1) % len(self.keys)
+            key = self.keys[self.current_key_index]
             self.key_usage[key] += 1
             return key
     
     def get_current_key(self):
         """Gets the current API key"""
-        return self.google_keys[self.current_key_index]
+        return self.keys[self.current_key_index]
     
     async def get_least_used_key(self):
         """Gets the least-used API key"""
@@ -175,8 +166,13 @@ class APIKeyManager:
             self.key_usage[key] += 1
             return key
 
-# Initialize API key manager
-api_key_manager = APIKeyManager()
+# Initialize Google API key manager
+google_keys = sorted([v for k, v in os.environ.items() if k.startswith('GOOGLE_API_KEY')])
+api_key_manager = APIKeyManager(google_keys)
+
+# Initialize Speechify API key manager
+speechify_keys = sorted([v for k, v in os.environ.items() if k.startswith('SPEECHIFY_KEY')])
+speechify_api_key_manager = APIKeyManager(speechify_keys)
 
 
 
@@ -202,13 +198,8 @@ def login_required(f):
     return decorated_function
 
 
-# Configure API keys
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-SPEECHIFY_KEY = os.getenv('SPEECHIFY_KEY')
-
-genai.configure(api_key=GOOGLE_API_KEY)
-speechify_client = AsyncSpeechify(token=SPEECHIFY_KEY)
-speechify_sync_client = Speechify(token=SPEECHIFY_KEY)
+# API keys are now managed by the APIKeyManager instances.
+# Global configuration is removed to allow for dynamic key rotation per request.
 
 async def generate_image(prompt):
     """Generate image from prompt using Runware API and upload to Cloudinary"""
@@ -286,6 +277,10 @@ def find_character(name, char_db):
 async def generate_voice(text):
     """Generate voice from text using Speechify and upload to Cloudinary"""
     try:
+        # Get a key for this request using round-robin
+        speechify_key = await speechify_api_key_manager.get_next_key()
+        speechify_client = AsyncSpeechify(token=speechify_key)
+
         ssml_input = f'<speak><speechify:style emotion="assertive">{text}</speechify:style></speak>'
         response = await speechify_client.tts.audio.speech(
             input=ssml_input,
@@ -684,10 +679,17 @@ Return ONLY a JSON object in this format, with a list of prompts matching the nu
 }}
 '''
         
+        safety_settings = {
+            genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+        }
+
         image_prompts_response = None
         for i in range(len(api_key_manager.google_keys)): # Retry for each key
             try:
-                image_prompts_response = model.generate_content(prompt_for_gemini)
+                image_prompts_response = model.generate_content(prompt_for_gemini, safety_settings=safety_settings)
                 break # Success
             except exceptions.ResourceExhausted as e:
                 print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
@@ -1136,10 +1138,19 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
 
         # 6. Generate audio files
         yield progress_update('Generating audio files...', 75, 100)
-        audio_tasks = [generate_voice(story_data['title'])] + [generate_voice(p) for p in story_data['paragraphs']]
-        audio_files = await asyncio.gather(*audio_tasks)
+        audio_files = []
+        texts_to_voice = [story_data['title']] + story_data['paragraphs']
+        num_texts = len(texts_to_voice)
+        for i, text in enumerate(texts_to_voice):
+            audio_url = await generate_voice(text)
+            audio_files.append(audio_url)
+            # Add a short delay to respect potential rate limits
+            await asyncio.sleep(1)
+            
+            # Calculate progress (from 75% to 95% during audio generation)
+            progress = 75 + int(20 * (i + 1) / num_texts)
+            yield progress_update(f'Generated audio {i + 1} of {num_texts}', progress, 100, {'audio_file': audio_url, 'index': i})
         story_data['audio_files'] = audio_files
-        yield progress_update(f'Generated {len(audio_files)} audio files', 95, 100)
 
         # Finalize
         story_data['email'] = email
