@@ -59,82 +59,113 @@ document.addEventListener('touchend', function(event) {
         }
 
         document.getElementById('storyForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const loading = document.getElementById('loading');
-            const result = document.getElementById('result');
-            const gamePrompt = document.getElementById('game-prompt');
-            
-            loading.classList.remove('hidden');
-            result.classList.add('hidden');
-            gamePrompt.classList.remove('hidden');
-            
-            // Reset progress
-            completedTasks = 0;
-            updateProgress('Creating story...', 0);
-            updateTaskStatus('task1', 'in-progress');
-            updateTaskStatus('task2', 'pending');
-            updateTaskStatus('task3', 'pending');
-            
-            const formData = new FormData(e.target);
-            const prompt = formData.get('prompt');
-            const imageMode = formData.get('imageMode');
-            const public = formData.get('public') === 'on';
-            const minParagraphs = formData.get('minParagraphs');
-            const maxParagraphs = formData.get('maxParagraphs');
+    e.preventDefault();
 
-            const eventSource = new EventSource(`/generate_story_stream?prompt=${prompt}&imageMode=${imageMode}&minParagraphs=${minParagraphs}&maxParagraphs=${maxParagraphs}&public=${public}`);
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const gamePrompt = document.getElementById('game-prompt');
 
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
+    loading.classList.remove('hidden');
+    result.classList.add('hidden');
+    gamePrompt.classList.remove('hidden');
 
-                if (data.error) {
-                    console.error('Error:', data.error);
-                    alert('An error occurred while creating the story');
-                    updateTaskStatus('task1', 'error');
-                    updateTaskStatus('task2', 'error');
-                    updateTaskStatus('task3', 'error');
-                    eventSource.close();
-                    loading.classList.add('hidden');
-                    return;
+    // Reset progress
+    updateProgress('Preparing your story...', 0);
+    updateTaskStatus('task1', 'pending');
+    updateTaskStatus('task2', 'pending');
+    updateTaskStatus('task3', 'pending');
+
+    const formData = new FormData(e.target);
+    const prompt = formData.get('prompt');
+    const imageMode = formData.get('imageMode');
+    const isPublic = formData.get('public') === 'on';
+    const minParagraphs = formData.get('minParagraphs');
+    const maxParagraphs = formData.get('maxParagraphs');
+
+    // 1. Start the generation task
+    try {
+        const startResponse = await fetch('/start-story-generation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                prompt: prompt,
+                imageMode: imageMode,
+                public: isPublic,
+                minParagraphs: minParagraphs,
+                maxParagraphs: maxParagraphs
+            }),
+        });
+
+        const startData = await startResponse.json();
+
+        if (!startData.success) {
+            throw new Error(startData.error || 'Failed to start story generation.');
+        }
+
+        const taskUUID = startData.task_uuid;
+
+        // 2. Poll for status
+        const pollInterval = setInterval(async () => {
+            try {
+                const statusResponse = await fetch(`/generation-status/${taskUUID}`);
+                const statusData = await statusResponse.json();
+
+                if (!statusData.success) {
+                    throw new Error(statusData.error || 'Failed to get task status.');
                 }
 
-                updateProgress(data.task, data.progress, data.total);
+                // Update UI with progress
+                updateProgress(statusData.task_message, statusData.progress, 100);
 
-                if (data.task.includes('Creating story content')) {
+                // Update task list based on progress
+                if (statusData.progress < 10) {
                     updateTaskStatus('task1', 'in-progress');
-                } else if (data.task.includes('Story content generated')) {
+                } else if (statusData.progress >= 10 && statusData.progress < 20) {
                     updateTaskStatus('task1', 'completed');
                     updateTaskStatus('task2', 'in-progress');
-                } else if (data.task.includes('Generating image prompts')) {
+                } else if (statusData.progress >= 20 && statusData.progress < 95) {
                     updateTaskStatus('task2', 'completed');
                     updateTaskStatus('task3', 'in-progress');
-                } else if (data.task.includes('Generating image')) {
-                    updateTaskStatus('task3', 'in-progress');
+                } else if (statusData.progress >= 95) {
+                    updateTaskStatus('task3', 'completed');
                 }
 
-                if (data.task === 'Finished!') {
+                // Check for completion or failure
+                if (statusData.status === 'completed') {
+                    clearInterval(pollInterval);
                     updateTaskStatus('task1', 'completed');
                     updateTaskStatus('task2', 'completed');
                     updateTaskStatus('task3', 'completed');
-                    displayResults(data.data);
-                    eventSource.close();
+                    displayResults(statusData.result);
                     loading.classList.add('hidden');
                     stopGame(); // Stop the game
                     document.getElementById('game-container').classList.add('hidden');
+                } else if (statusData.status === 'failed') {
+                    clearInterval(pollInterval);
+                    throw new Error(statusData.error || 'Story generation failed.');
                 }
-            };
-
-            eventSource.onerror = function(err) {
-                console.error("EventSource failed:", err);
-                alert('An error occurred while creating the story');
+            } catch (pollError) {
+                clearInterval(pollInterval);
+                console.error("Polling failed:", pollError);
+                alert(pollError.message);
                 updateTaskStatus('task1', 'error');
                 updateTaskStatus('task2', 'error');
                 updateTaskStatus('task3', 'error');
-                eventSource.close();
                 loading.classList.add('hidden');
-            };
-        });
+            }
+        }, 3000); // Poll every 3 seconds
+
+    } catch (startError) {
+        console.error("Starting generation failed:", startError);
+        alert(startError.message);
+        updateTaskStatus('task1', 'error');
+        updateTaskStatus('task2', 'error');
+        updateTaskStatus('task3', 'error');
+        loading.classList.add('hidden');
+    }
+});
 
         document.getElementById('play-game-yes').addEventListener('click', () => {
             document.getElementById('game-prompt').classList.add('hidden');
