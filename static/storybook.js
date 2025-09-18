@@ -107,4 +107,35 @@ document.addEventListener('DOMContentLoaded', () => {
             showPage(currentPage);
         }
     });
+
+    const shareBtn = document.getElementById('share-btn');
+    shareBtn.addEventListener('click', () => {
+        const shareLink = document.getElementById('share-link').value;
+        navigator.clipboard.writeText(shareLink).then(() => {
+            Toastify({
+                text: "Link copied to clipboard!",
+                duration: 3000,
+                close: true,
+                gravity: "top",
+                position: "center",
+                style: {
+                    background: "linear-gradient(to right, #00b09b, #96c93d)",
+                    fontFamily: "'Press Start 2P', cursive"
+                }
+            }).showToast();
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+            Toastify({
+                text: "Failed to copy link!",
+                duration: 3000,
+                close: true,
+                gravity: "top",
+                position: "center",
+                style: {
+                    background: "linear-gradient(to right, #ff5f6d, #ffc371)",
+                    fontFamily: "'Press Start 2P', cursive"
+                }
+            }).showToast();
+        });
+    });
 });

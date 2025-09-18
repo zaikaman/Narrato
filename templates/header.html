@@ -1,0 +1,24 @@
+<div class="flex justify-between items-center mb-8">
+    <div class="flex items-center">
+        <a href="{{ url_for('index') }}" class="flex items-center">
+            <img src="/static/images/logo.png" alt="Logo" class="h-16">
+            <img src="/static/images/logo-text.png" alt="Logo Text" class="h-12 ml-4">
+        </a>
+    </div>
+    <div class="flex items-center">
+        {% if show_browse_button %}
+        <a href="{{ url_for('browse_stories') }}" class="pixel-button">Browse</a>
+        {% endif %}
+        {% if session['email'] %}
+            <div class="dropdown ml-4">
+                <button class="pixel-button">Account</button>
+                <div class="dropdown-content">
+                    <a href="{{ url_for('story_history') }}">Story History</a>
+                </div>
+            </div>
+            <a href="{{ url_for('logout') }}" class="ml-4 pixel-button logout-button">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}" class="ml-4 pixel-button">Login</a>
+        {% endif %}
+    </div>
+</div>

@@ -6,6 +6,9 @@
     <title>{{ story.title }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='storybook.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" media="(max-width: 480px)" href="{{ url_for('static', filename='mobile.css') }}">
 </head>
 <body>
     <div class="header">
@@ -19,11 +22,19 @@
         <div id="page-container"></div>
         <button id="prev-btn" class="pixel-button">&larr;</button>
         <button id="next-btn" class="pixel-button">&rarr;</button>
+        <div class="actions">
+            <button id="share-btn" class="pixel-button"><i class="fas fa-share-alt"></i><span class="tooltiptext">Share</span></button>
+            <a href="{{ url_for('export_pdf', story_uuid=story.story_uuid) }}" class="pixel-button"><i class="fas fa-file-pdf"></i><span class="tooltiptext">Export to PDF</span></a>
+        </div>
     </div>
+    <input type="text" id="share-link" value="{{ request.url }}" style="position: absolute; left: -9999px;">
     <audio id="audio-player" controls class="hidden"></audio>
+    <script id="story-data" type="application/json">{{ story|tojson|safe }}</script>
     <script>
-        const storyData = {{ story|tojson }};
+        const storyData = JSON.parse(document.getElementById('story-data').textContent);
     </script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ url_for('static', filename='storybook.js') }}"></script>
 </body>
 </html>

@@ -1,0 +1,14 @@
+.actions {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    display: flex;
+    gap: 10px;
+}
+
+.actions .pixel-button, .actions a.pixel-button {
+    width: 40px;
+    height: 40px;
+}

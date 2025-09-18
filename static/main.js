@@ -79,10 +79,11 @@ document.addEventListener('touchend', function(event) {
             const formData = new FormData(e.target);
             const prompt = formData.get('prompt');
             const imageMode = formData.get('imageMode');
+            const public = formData.get('public') === 'on';
             const minParagraphs = formData.get('minParagraphs');
             const maxParagraphs = formData.get('maxParagraphs');
 
-            const eventSource = new EventSource(`/generate_story_stream?prompt=${prompt}&imageMode=${imageMode}&minParagraphs=${minParagraphs}&maxParagraphs=${maxParagraphs}`);
+            const eventSource = new EventSource(`/generate_story_stream?prompt=${prompt}&imageMode=${imageMode}&minParagraphs=${minParagraphs}&maxParagraphs=${maxParagraphs}&public=${public}`);
 
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);

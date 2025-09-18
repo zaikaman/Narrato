@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ story.title }}</title>
+    <style>
+        body {
+            font-family: "DejaVu Sans", sans-serif;
+        }
+        img {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ story.title }}</h1>
+    {% for i in range(story.paragraphs|length) %}
+        {% if i < story.images|length and story.images[i].url %}
+            <img src="{{ story.images[i].url }}">
+        {% endif %}
+        <p>{{ story.paragraphs[i] }}</p>
+    {% endfor %}
+    <p><b>Moral of the story:</b> {{ story.moral }}</p>
+</body>
+</html>

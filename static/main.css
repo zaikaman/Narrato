@@ -167,6 +167,32 @@ body {
     box-shadow: 2px 2px #000;
 }
 
+.story-form-container input[type="checkbox"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #fff;
+    background-color: #333;
+    box-shadow: inset 2px 2px #000;
+    cursor: pointer;
+    position: relative;
+}
+
+.story-form-container input[type="checkbox"]:checked::before {
+    content: '';
+    display: block;
+    width: 10px;
+    height: 10px;
+    background-color: #fff;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 2px 2px #000;
+}
+
 .pixel-button {
     background-color: #4CAF50; /* A classic green */
     color: white;
@@ -343,3 +369,5 @@ body {
         padding: 1rem;
     }
 }
+
+

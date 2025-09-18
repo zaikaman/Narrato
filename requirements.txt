@@ -8,3 +8,4 @@ python-multipart
 aiohttp
 cloudinary
 speechify-api
+xhtml2pdf

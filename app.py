@@ -20,6 +20,8 @@ import requests
 import uuid
 import base64
 import json
+from google.api_core import exceptions
+
 
 # Shov.com configuration
 SHOV_API_KEY = os.getenv("SHOV_API_KEY")
@@ -61,8 +63,18 @@ def shov_add(collection_name, value):
         "Content-Type": "application/json"
     }
     data = {"name": collection_name, "value": value}
-    response = requests.post(f"{SHOV_API_URL}/add/{PROJECT_NAME}", headers=headers, json=data)
-    return response.json()
+    print(f"--- Shov Add --- PRE-REQUEST: Adding to collection '{collection_name}'")
+    try:
+        response = requests.post(f"{SHOV_API_URL}/add/{PROJECT_NAME}", headers=headers, json=data)
+        print(f"--- Shov Add --- POST-REQUEST: Status Code: {response.status_code}")
+        response_json = response.json()
+        print(f"--- Shov Add --- POST-REQUEST: JSON Response: {response_json}")
+        return response_json
+    except requests.exceptions.RequestException as e:
+        print(f"--- Shov Add --- FATAL: RequestException: {e}")
+        return {"success": False, "error": "RequestException", "details": str(e)}
+    except json.JSONDecodeError:
+        return {"success": False, "error": "JSONDecodeError", "details": "API returned success status but response was not valid JSON."}
 
 def shov_where(collection_name, filter_dict=None):
     """Filter items in a collection based on JSON properties."""
@@ -103,7 +115,7 @@ def shov_remove(collection_name, item_id):
         headers = {
             "Authorization": f"Bearer {SHOV_API_KEY}"
         }
-        data = {"collection": collection_name}
+        data = {"name": collection_name}
         print(f"--- Shov Remove --- PRE-REQUEST: Deleting {item_id} from {collection_name}")
         response = requests.post(f"{SHOV_API_URL}/remove/{PROJECT_NAME}/{item_id}", headers=headers, json=data)
         
@@ -132,7 +144,13 @@ class APIKeyManager:
             os.getenv('GOOGLE_API_KEY'),
             os.getenv('GOOGLE_API_KEY_2'),
             os.getenv('GOOGLE_API_KEY_3'),
-            os.getenv('GOOGLE_API_KEY_4')
+            os.getenv('GOOGLE_API_KEY_4'),
+            os.getenv('GOOGLE_API_KEY_5'),
+            os.getenv('GOOGLE_API_KEY_6'),
+            os.getenv('GOOGLE_API_KEY_7'),
+            os.getenv('GOOGLE_API_KEY_8'),
+            os.getenv('GOOGLE_API_KEY_9'),
+            os.getenv('GOOGLE_API_KEY_10')
         ]
         self.current_key_index = 0
         self.key_usage = {key: 0 for key in self.google_keys}
@@ -159,6 +177,14 @@ class APIKeyManager:
 
 # Initialize API key manager
 api_key_manager = APIKeyManager()
+
+import requests
+
+url = "https://github.com/dejavu-fonts/dejavu-fonts/blob/main/ttf/DejaVuSans.ttf?raw=true"
+response = requests.get(url)
+
+with open("static/DejaVuSans.ttf", "wb") as f:
+    f.write(response.content)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
@@ -337,9 +363,13 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         genai.configure(api_key=api_key)
         print("Initialized Gemini model with new API key")
         
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         print("Sending story creation request...")
-        english_story_response = model.generate_content(f"""
+        
+        english_story_response = None
+        for i in range(len(api_key_manager.google_keys)): # Retry for each key
+            try:
+                english_story_response = model.generate_content(f'''
         You are a master storyteller writing an engaging and detailed story for a general audience. 
         Create a rich, vivid story based on this theme: {prompt}
 
@@ -382,9 +412,17 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         - Return ONLY the JSON object, no other text
         - Number of paragraphs should be between {min_paragraphs} and {max_paragraphs}
         - The story should feel complete, don't force it to exactly {max_paragraphs} paragraphs
-        - Focus on quality and detail in each paragraph while keeping them concise
-        """)
+        ''')
+                break # Success
+            except exceptions.ResourceExhausted as e:
+                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
+                api_key = await api_key_manager.get_next_key()
+                genai.configure(api_key=api_key)
+                print("Switched to new API key.")
         
+        if not english_story_response:
+            raise Exception("Failed to generate story content after multiple retries.")
+
         print("Received response from Gemini")
         
         # Get text response and clean it up
@@ -451,9 +489,11 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
 async def analyze_story_characters(story_data):
     """Analyze and create consistent descriptions for all characters in the story"""
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
-        character_analysis = model.generate_content(f"""
+        for i in range(len(api_key_manager.google_keys)): # Retry for each key
+            try:
+                character_analysis = model.generate_content(f'''
         You are a character designer creating consistent descriptions for all characters in this story. 
         Analyze the entire story carefully and create detailed, consistent descriptions that will be used for ALL images.
         
@@ -504,8 +544,18 @@ async def analyze_story_characters(story_data):
                 }}
             ]
         }}
-        """)
+        ''')
+                break # Success
+            except exceptions.ResourceExhausted as e:
+                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
+                api_key = await api_key_manager.get_next_key()
+                genai.configure(api_key=api_key)
+                print("Switched to new API key.")
         
+        if not character_analysis:
+            print("Failed to generate character analysis after multiple retries.")
+            return None
+            
         try:
             char_text = character_analysis.text.strip()
             char_text = re.sub(r'```(?:json)?\s*|\s*```', '', char_text)
@@ -537,7 +587,7 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
         genai.configure(api_key=api_key)
         print(f"Using new API key for generate_image_prompt")
         
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Get prompt history from story_data
         previous_prompts = story_data.get('previous_prompts', []) if story_data else []
@@ -551,7 +601,10 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
             """
 
         # Analyze the paragraph to identify which characters appear
-        character_mention_analysis = model.generate_content(f"""
+        character_mention_analysis = None
+        for i in range(len(api_key_manager.google_keys)): # Retry for each key
+            try:
+                character_mention_analysis = model.generate_content(f"""
         Analyze this paragraph and identify which characters appear in it.
         Also identify their emotional state or any significant changes in appearance.
         
@@ -568,12 +621,22 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
             ]
         }}
         """ )
+                break # Success
+            except exceptions.ResourceExhausted as e:
+                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
+                api_key = await api_key_manager.get_next_key()
+                genai.configure(api_key=api_key)
+                print("Switched to new API key.")
         
-        try:
-            char_mentions = json.loads(character_mention_analysis.text)
-            mentioned_chars = char_mentions.get('characters', [])
-        except:
+        if not character_mention_analysis:
+            print("Failed to generate character mention analysis after multiple retries.")
             mentioned_chars = []
+        else:
+            try:
+                char_mentions = json.loads(character_mention_analysis.text)
+                mentioned_chars = char_mentions.get('characters', [])
+            except:
+                mentioned_chars = []
 
         # Get character information from the character_database
         character_descriptions = []
@@ -620,7 +683,10 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
             """
             
         # Create a prompt with the full character description and prompt history
-        image_prompt_response = model.generate_content(f"""
+        image_prompt_response = None
+        for i in range(len(api_key_manager.google_keys)): # Retry for each key
+            try:
+                image_prompt_response = model.generate_content(f"""
         You are a visual artist creating prompts for an AI image generator.
         Create a detailed image generation prompt for this story paragraph while maintaining STRICT character and style consistency.
 
@@ -645,6 +711,16 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
         
         Return ONLY the prompt, no additional text or explanations.
         """ )
+                break # Success
+            except exceptions.ResourceExhausted as e:
+                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
+                api_key = await api_key_manager.get_next_key()
+                genai.configure(api_key=api_key)
+                print("Switched to new API key.")
+        
+        if not image_prompt_response:
+            print("Failed to generate image prompt after multiple retries.")
+            return "A beautiful illustration in digital art style, vibrant colors, detailed"
         
         prompt = image_prompt_response.text.strip()
         # Remove quotes and special characters
@@ -661,7 +737,7 @@ async def generate_image_prompt(paragraph, story_data=None, paragraph_index=0, p
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', show_browse_button=True)
 
 @app.route('/audio/<path:filename>')
 def serve_audio(filename):
@@ -678,6 +754,14 @@ def list_stories():
 
 from urllib.parse import unquote
 
+
+
+@app.route('/browse')
+def browse_stories():
+    """Browse all public stories"""
+    stories_response = shov_where('stories', {'public': True})
+    public_stories = stories_response.get('items', [])
+    return render_template('browse.html', stories=public_stories, show_browse_button=False)
 
 
 @app.route('/stories/<title>')
@@ -701,7 +785,6 @@ def view_story(story_uuid):
         story = stories[0]['value']
         return render_template('story_view.html', story=story)
     return "Story not found", 404
-
 
 
 
@@ -775,6 +858,7 @@ def delete_story():
 def generate_story_stream():
     prompt = request.args.get('prompt')
     image_mode = request.args.get('imageMode', 'generate')
+    public = request.args.get('public') == 'true'
     min_paragraphs = int(request.args.get('minParagraphs', 15))
     max_paragraphs = int(request.args.get('maxParagraphs', 20))
     email = session.get('email')
@@ -783,7 +867,7 @@ def generate_story_stream():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            gen = generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, email)
+            gen = generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, email, public)
             while True:
                 try:
                     progress = loop.run_until_complete(gen.__anext__())
@@ -795,12 +879,13 @@ def generate_story_stream():
 
     return Response(generate(), mimetype='text/event-stream')
 
-async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, email):
+async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, email, public):
     """Generate story and stream progress"""
     print("\n=== Starting generate_story endpoint ===")
     print(f"Received prompt: {prompt}")
     print(f"Image mode: {image_mode}")
     print(f"Paragraph range: {min_paragraphs}-{max_paragraphs}")
+    print(f"Public: {public}")
     
     def progress_update(task, step, total, data=None):
         return {"task": task, "progress": step, "total": total, "data": data}
@@ -817,8 +902,12 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
         yield progress_update('Generating style guide...', 10, 100)
         api_key = await api_key_manager.get_next_key()
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        style_guide = model.generate_content(f"""
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        style_guide = None
+        for i in range(len(api_key_manager.google_keys)):
+            try:
+                style_guide = model.generate_content(f'''
         Create a consistent art style guide for this story. Read the title and first few paragraphs:
         Title: {story_data['title']}
         Story start: {' '.join(story_data['paragraphs'][:5])}
@@ -834,7 +923,16 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
                 "perspective": "How scenes should be framed"
             }}
         }}
-        """ ) 
+        ''' )
+                break
+            except exceptions.ResourceExhausted as e:
+                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
+                api_key = await api_key_manager.get_next_key()
+                genai.configure(api_key=api_key)
+                print("Switched to new API key.")
+
+        if not style_guide:
+            raise Exception("Failed to generate style guide after multiple retries.") 
         
         try:
             style_text = style_guide.text.strip()
@@ -909,7 +1007,11 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
         # Finalize
         story_data['email'] = email
         story_data['story_uuid'] = str(uuid.uuid4())
-        shov_add('stories', story_data)
+        story_data['public'] = public
+        add_response = shov_add('stories', story_data)
+        if not add_response.get('success'):
+            error_details = add_response.get('details', 'No details provided.')
+            print(f"CRITICAL: Failed to save story to history. Error: {add_response.get('error')}. Details: {error_details}")
         
         yield progress_update('Finished!', 100, 100, story_data)
         
@@ -919,6 +1021,54 @@ async def generate_story(prompt, image_mode, min_paragraphs, max_paragraphs, ema
         yield progress_update('Error', 100, 100, {"error": str(e)})
 
 
+
+
+
+from xhtml2pdf import pisa
+from io import BytesIO
+import requests
+import base64
+
+@app.route('/export_pdf/<story_uuid>')
+def export_pdf(story_uuid):
+    """Export a story as a PDF"""
+    story_response = shov_where('stories', {'story_uuid': story_uuid})
+    stories = story_response.get('items', [])
+    if stories:
+        story = stories[0]['value']
+
+        # Download images and convert to data URIs
+        if 'images' in story:
+            for image_data in story['images']:
+                if image_data.get('url'):
+                    try:
+                        response = requests.get(image_data['url'], timeout=10)
+                        response.raise_for_status()
+                        encoded_string = base64.b64encode(response.content).decode('utf-8')
+                        image_data['url'] = f"data:image/jpeg;base64,{encoded_string}"
+                    except requests.exceptions.RequestException as e:
+                        print(f"Could not fetch image {image_data['url']}: {e}")
+                        image_data['url'] = '' # Set to empty if download fails
+
+        html = render_template('pdf_template.html', story=story)
+        
+        pdf_file = BytesIO()
+        pisa_status = pisa.CreatePDF(
+            BytesIO(html.encode('UTF-8')),
+            dest=pdf_file,
+            encoding='UTF-8'
+        )
+
+        if pisa_status.err:
+            return "Error creating PDF", 500
+
+        pdf_file.seek(0)
+        
+        response = Response(pdf_file.read(), mimetype='application/pdf')
+        response.headers['Content-Disposition'] = f'attachment; filename="{story["title"]}.pdf"'
+        return response
+
+    return "Story not found", 404
 
 
 

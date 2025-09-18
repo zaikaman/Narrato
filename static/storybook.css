@@ -87,9 +87,8 @@ body {
     border-radius: 0;
     cursor: pointer;
     transition: all 0.1s ease-in-out;
-    position: absolute;
-    bottom: 20px;
     font-size: 2em;
+    text-decoration: none;
 }
 
 .pixel-button:hover {
@@ -101,7 +100,19 @@ body {
 #play-story-btn {
     font-size: 2em;
     margin-top: 20px;
-    position: relative;
+}
+
+#prev-btn, #next-btn {
+    position: absolute;
+    bottom: 20px;
+    font-size: 1em;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2;
 }
 
 #prev-btn {
@@ -146,6 +157,53 @@ body {
     color: #4CAF50;
 }
 
+.actions {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    display: flex;
+    gap: 10px;
+}
+
+.actions .pixel-button, .actions a.pixel-button {
+    font-size: 1em;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    line-height: 1;
+}
+
+.actions .pixel-button .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: #555;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 0;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -60px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.actions .pixel-button:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+
+
+
 @media (max-width: 800px) {
     #storybook {
         width: 95%;
@@ -168,6 +226,10 @@ body {
         padding: 8px 15px;
     }
 
+    #prev-btn, #next-btn {
+        bottom: 10px;
+    }
+
     #prev-btn {
         left: 10px;
     }
@@ -175,24 +237,7 @@ body {
     #next-btn {
         right: 10px;
     }
+
 }
 
-@media (max-width: 480px) {
-    #storybook {
-        padding: 0.5rem;
-    }
 
-    .page p {
-        font-size: 0.9em;
-        padding-bottom: 60px;
-    }
-
-    .pixel-button {
-        font-size: 1.2em;
-        bottom: 10px;
-    }
-
-    #title-screen h1 {
-        font-size: 3em;
-    }
-}
