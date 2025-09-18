@@ -3,8 +3,14 @@ const bird = document.getElementById('bird');
 const scoreElement = document.getElementById('score');
 const playAgainButton = document.getElementById('play-again-button');
 
-const GAME_WIDTH = 400;
-const GAME_HEIGHT = 400;
+let GAME_WIDTH = gameContainer.offsetWidth;
+let GAME_HEIGHT = gameContainer.offsetHeight;
+
+window.addEventListener('resize', () => {
+    GAME_WIDTH = gameContainer.offsetWidth;
+    GAME_HEIGHT = gameContainer.offsetHeight;
+    stopGame();
+});
 const BIRD_SIZE = 40;
 const GRAVITY = 0.5;
 const JUMP_FORCE = -8;
