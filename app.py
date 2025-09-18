@@ -1121,11 +1121,15 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
         # 5. Generate images
         if image_mode == 'generate':
             yield progress_update('Generating images...', 40, 100)
-            image_tasks = [generate_image(p) for p in image_prompts]
-            image_urls = await asyncio.gather(*image_tasks)
-            image_data = [{'url': url, 'prompt': p} for url, p in zip(image_urls, image_prompts)]
+            image_data = []
             story_data['images'] = image_data
-            yield progress_update(f'Generated {len(image_urls)} images', 70, 100)
+            num_prompts = len(image_prompts)
+            for i, p in enumerate(image_prompts):
+                image_url = await generate_image(p)
+                image_data.append({'url': image_url, 'prompt': p})
+                # Calculate progress from 40% to 70% during image generation
+                progress = 40 + int(30 * (i + 1) / num_prompts)
+                yield progress_update(f'Generated image {i + 1} of {num_prompts}', progress, 100, story_data)
         else:
             story_data['images'] = [{'prompt': p, 'url': None} for p in image_prompts]
             yield progress_update('Skipping image generation', 70, 100)
