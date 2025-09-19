@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
     restartTourButton.onclick = () => {
         localStorage.removeItem('tour_step');
         localStorage.removeItem('tour_seen');
+        localStorage.removeItem('story_view_tour_seen');
         window.location.href = '/';
     };
     document.body.appendChild(restartTourButton);
@@ -131,10 +132,17 @@ document.addEventListener('DOMContentLoaded', function () {
         driver.start();
     } else if (document.querySelector('#storybook') && tourStep === 'story_view') { // On story view page
         const storybookElement = document.querySelector('#storybook');
+        const tourSeen = localStorage.getItem('story_view_tour_seen');
+
+        if (tourSeen) {
+            return;
+        }
         
         if (!storybookElement.classList.contains('hidden')) {
             driver.defineSteps(storyViewPageSteps);
             driver.start();
+            localStorage.setItem('story_view_tour_seen', 'true');
+            localStorage.removeItem('tour_step');
         } else {
             const observer = new MutationObserver((mutationsList, obs) => {
                 for(const mutation of mutationsList) {
@@ -142,6 +150,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (!storybookElement.classList.contains('hidden')) {
                             driver.defineSteps(storyViewPageSteps);
                             driver.start();
+                            localStorage.setItem('story_view_tour_seen', 'true');
+                            localStorage.removeItem('tour_step');
                             obs.disconnect();
                         }
                     }
