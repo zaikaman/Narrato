@@ -1,7 +1,7 @@
-# AutoAistory: The AI-Powered Multimedia Storyteller
+# Narrato: The AI-Powered Multimedia Storyteller
 
 <p align="center">
-  <img src="./static/images/logo-text.png" alt="AutoAistory Logo" width="400"/>
+  <img src="./static/images/logo-text.png" alt="Narrato Logo" width="400"/>
 </p>
 
 <p align="center">
@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License"/>
 </p>
 
-**AutoAistory** is a magical web application that brings your ideas to life by automatically generating, illustrating, and narrating complete stories from a single prompt. Using a powerful pipeline of generative AI models, it creates a rich, multi-sensory storytelling experience.
+**Narrato** is a magical web application that brings your ideas to life by automatically generating, illustrating, and narrating complete stories from a single prompt. Using a powerful pipeline of generative AI models, it creates a rich, multi-sensory storytelling experience.
 
 > **Note:** The live demo is hosted on a free Heroku instance and may be slow or unavailable at times.
 
@@ -30,7 +30,7 @@
 
 ## 🚀 How It Works: The AI Pipeline
 
-AutoAistory's magic lies in its state-of-the-art AI pipeline that ensures a high-quality, consistent output.
+Narrato's magic lies in its state-of-the-art AI pipeline that ensures a high-quality, consistent output.
 
 1.  **Prompt -> Story:** You provide a prompt. **Google Gemini** writes a complete story with a title, paragraphs, and a moral.
 2.  **Story -> Analysis:** The application uses **Gemini** again to read the generated story and create two crucial documents:
@@ -43,7 +43,7 @@ AutoAistory's magic lies in its state-of-the-art AI pipeline that ensures a high
 
 ## 🛠️ Getting Started: Local Installation
 
-Follow these steps to run AutoAistory on your local machine.
+Follow these steps to run Narrato on your local machine.
 
 ### Prerequisites
 
