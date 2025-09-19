@@ -94,7 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
             nextBtn.classList.remove('hidden');
         }
 
-        pageNumberDisplay.textContent = `${pageNumber + 1} / ${pages.length}`;
+                document.getElementById('current-page').textContent = pageNumber + 1;
+        document.getElementById('total-pages').textContent = pages.length;
     }
 
     nextBtn.addEventListener('click', () => {

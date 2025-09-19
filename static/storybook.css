@@ -104,7 +104,7 @@ body {
 
 #prev-btn, #next-btn {
     position: absolute;
-    bottom: 20px;
+    bottom: 300px;
     font-size: 1em;
     padding: 0;
     width: 40px;
@@ -229,7 +229,7 @@ body {
     }
 
     #prev-btn, #next-btn {
-        bottom: 10px;
+        bottom: 300px;
     }
 
     #prev-btn {
@@ -244,9 +244,12 @@ body {
 
 #page-number {
     position: absolute;
-    bottom: 60px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 20px;
+    right: 20px; /* Changed from left/transform */
+    width: 100px; /* Give it a specific width */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-size: 1.2em;
     text-shadow: 2px 2px #000;
 }

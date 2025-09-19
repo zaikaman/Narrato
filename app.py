@@ -35,8 +35,15 @@ def shov_set(key, value):
         "Content-Type": "application/json"
     }
     data = {"key": key, "value": value}
-    response = requests.post(f"{SHOV_API_URL}/set/{PROJECT_NAME}", headers=headers, json=data)
-    return response.json()
+    try:
+        response = requests.post(f"{SHOV_API_URL}/set/{PROJECT_NAME}", headers=headers, json=data)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"--- Shov Set --- FATAL: RequestException: {e}")
+        return {"success": False, "error": "RequestException", "details": str(e)}
+    except json.JSONDecodeError:
+        return {"success": False, "error": "JSONDecodeError", "details": "API returned success status but response was not valid JSON."}
 
 def shov_get(key):
     """Retrieve a key-value pair from the shov.com database."""
@@ -45,8 +52,15 @@ def shov_get(key):
         "Content-Type": "application/json"
     }
     data = {"key": key}
-    response = requests.post(f"{SHOV_API_URL}/get/{PROJECT_NAME}", headers=headers, json=data)
-    return response.json()
+    try:
+        response = requests.post(f"{SHOV_API_URL}/get/{PROJECT_NAME}", headers=headers, json=data)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"--- Shov Get --- FATAL: RequestException: {e}")
+        return {"success": False, "error": "RequestException", "details": str(e)}
+    except json.JSONDecodeError:
+        return {"success": False, "error": "JSONDecodeError", "details": "API returned success status but response was not valid JSON."}
 
 def shov_contents():
     """List all items in the shov.com project."""
@@ -85,8 +99,17 @@ def shov_where(collection_name, filter_dict=None):
     data = {"name": collection_name}
     if filter_dict:
         data['filter'] = filter_dict
-    response = requests.post(f"{SHOV_API_URL}/where/{PROJECT_NAME}", headers=headers, json=data)
-    return response.json()
+    
+    try:
+        response = requests.post(f"{SHOV_API_URL}/where/{PROJECT_NAME}", headers=headers, json=data)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"--- Shov Where --- FATAL: RequestException: {e}")
+        return {"success": False, "error": "RequestException", "details": str(e), "items": []}
+    except json.JSONDecodeError:
+        print(f"--- Shov Where --- FATAL: JSONDecodeError")
+        return {"success": False, "error": "JSONDecodeError", "details": "API returned success status but response was not valid JSON.", "items": []}
 
 def shov_send_otp(email):
     """Send OTP to the user's email."""
@@ -137,6 +160,16 @@ def shov_remove(collection_name, item_id):
     except Exception as e:
         print(f"--- Shov Remove --- FATAL: Unexpected error in shov_remove: {e}")
         return {"success": False, "error": "Unexpected error", "details": str(e)}
+
+def shov_forget(key):
+    """Permanently delete a key-value pair."""
+    headers = {
+        "Authorization": f"Bearer {SHOV_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {"key": key}
+    response = requests.post(f"{SHOV_API_URL}/forget/{PROJECT_NAME}", headers=headers, json=data)
+    return response.json()
 
 class APIKeyManager:
     """Manages and rotates API keys"""
@@ -1094,74 +1127,140 @@ def run_worker():
         
 # --- Local Development (Streaming) Endpoints ---
 
-async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_paragraphs, email, public):
-    """Generate story and stream progress. Used for local development."""
+async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_paragraphs, email, public, story_uuid=None):
+    """Generate story and stream progress, with state saving."""
     
     def progress_update(task, step, total, data=None):
         return {"task": task, "progress": step, "total": total, "data": data}
 
     try:
-        # 1. Generate story content
-        yield progress_update('Creating story content...', 0, 100)
-        story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
-        yield progress_update('Story content generated', 10, 100, story_data)
+        # Load or initialize state
+        step = 0
+        state_data = {}
+        shov_id = None
 
-        # 2 & 3. Generate style guide and analyze characters
-        yield progress_update('Analyzing story elements...', 15, 100)
-        style_task = generate_style_guide(story_data)
-        chars_task = analyze_story_characters(story_data)
-        style_data, char_data = await asyncio.gather(style_task, chars_task)
-        story_data['style_guide'] = style_data
-        story_data['character_database'] = char_data if char_data else {"main_characters": [], "supporting_characters": [], "groups": []}
-        yield progress_update('Story elements analyzed', 25, 100, story_data)
-        
-        # 4. Generate image prompts
-        yield progress_update('Generating image prompts...', 30, 100)
-        image_prompts = await generate_all_image_prompts(story_data)
-        yield progress_update(f'Generated {len(image_prompts)} prompts', 35, 100)
+        if story_uuid:
+            response = None
+            for _ in range(3): # Retry up to 3 times
+                response = shov_where('stream_progress', {'story_uuid': story_uuid})
+                if response and response.get('items'):
+                    break
+                await asyncio.sleep(0.5) # Wait 500ms
 
-        # 5. Generate images
-        if image_mode == 'generate':
-            yield progress_update('Generating images...', 40, 100)
-            image_data = []
-            story_data['images'] = image_data
-            num_prompts = len(image_prompts)
-            for i, p in enumerate(image_prompts):
-                image_url = await generate_image(p)
-                image_data.append({'url': image_url, 'prompt': p})
-                # Calculate progress from 40% to 70% during image generation
-                progress = 40 + int(30 * (i + 1) / num_prompts)
-                yield progress_update(f'Generated image {i + 1} of {num_prompts}', progress, 100, story_data)
-        else:
-            story_data['images'] = [{'prompt': p, 'url': None} for p in image_prompts]
-            yield progress_update('Skipping image generation', 70, 100)
+            if response and response.get('items'):
+                item = response['items'][0]
+                shov_id = item['id']
+                state_data = item['value']
+                step = state_data.get('step', 0)
+                print(f"Resuming story {story_uuid} (shov_id: {shov_id}) from step {step}")
 
-        # 6. Generate audio files
-        yield progress_update('Generating audio files...', 75, 100)
-        audio_files = []
-        texts_to_voice = [story_data['title']] + story_data['paragraphs']
-        num_texts = len(texts_to_voice)
-        for i, text in enumerate(texts_to_voice):
-            audio_url = await generate_voice(text)
-            audio_files.append(audio_url)
-            # Add a short delay to respect potential rate limits
-            await asyncio.sleep(1)
-            
-            # Calculate progress (from 75% to 95% during audio generation)
-            progress = 75 + int(20 * (i + 1) / num_texts)
-            yield progress_update(f'Generated audio {i + 1} of {num_texts}', progress, 100, {'audio_file': audio_url, 'index': i})
-        story_data['audio_files'] = audio_files
+        story_data = state_data.get('story_data', {})
+        image_prompts = state_data.get('image_prompts', [])
 
-        # Finalize
-        story_data['email'] = email
-        story_data['story_uuid'] = str(uuid.uuid4())
-        story_data['public'] = public
-        add_response = shov_add('stories', story_data)
-        if not add_response.get('success'):
-            error_details = add_response.get('details', 'No details provided.')
-            print(f"CRITICAL: Failed to save story to history. Error: {add_response.get('error')}. Details: {error_details}")
-        
-        yield progress_update('Finished!', 100, 100, story_data)
+        def save_progress(current_step, data_to_save):
+            nonlocal shov_id
+            state = {'step': current_step, 'story_uuid': story_uuid, **data_to_save}
+
+            if shov_id:
+                result = shov_update('stream_progress', shov_id, state)
+            else:
+                result = shov_add('stream_progress', state)
+                if result.get('success') and result.get('id'):
+                    shov_id = result['id']
+
+            if not result.get('success'):
+                print(f"CRITICAL: Failed to save progress for story {story_uuid}. Error: {result.get('details')}")
+                raise IOError(f"Failed to save progress: {result.get('details')}")
+            print(f"Saved progress for story {story_uuid} at step {current_step}")
+
+        if step > 0:
+            initial_progress = 10
+            if step == 2: initial_progress = 25
+            elif step == 3: initial_progress = 35
+            elif step == 4: initial_progress = 70
+            elif step == 5: initial_progress = 95
+            yield progress_update(f"Resuming generation...", initial_progress, 100, story_data)
+
+        while step < 6:
+            if step == 0:
+                # 1. Generate story content
+                yield progress_update('Creating story content...', 0, 100)
+                story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
+                save_progress(1, {'story_data': story_data})
+                yield progress_update('Story content generated', 10, 100, story_data)
+                step = 1
+            elif step == 1:
+                # 2 & 3. Generate style guide and analyze characters
+                yield progress_update('Analyzing story elements...', 15, 100)
+                style_task = generate_style_guide(story_data)
+                chars_task = analyze_story_characters(story_data)
+                style_data, char_data = await asyncio.gather(style_task, chars_task)
+                story_data['style_guide'] = style_data
+                story_data['character_database'] = char_data if char_data else {"main_characters": [], "supporting_characters": [], "groups": []}
+                save_progress(2, {'story_data': story_data})
+                yield progress_update('Story elements analyzed', 25, 100, story_data)
+                step = 2
+            elif step == 2:
+                # 4. Generate image prompts
+                yield progress_update('Generating image prompts...', 30, 100)
+                image_prompts = await generate_all_image_prompts(story_data)
+                save_progress(3, {'story_data': story_data, 'image_prompts': image_prompts})
+                yield progress_update(f'Generated {len(image_prompts)} prompts', 35, 100)
+                step = 3
+            elif step == 3:
+                # 5. Generate images
+                if image_mode == 'generate':
+                    yield progress_update('Generating images...', 40, 100)
+                    image_data = story_data.get('images', [])
+                    num_prompts = len(image_prompts)
+                    start_index = len(image_data)
+                    for i, p in enumerate(image_prompts[start_index:], start=start_index):
+                        image_url = await generate_image(p)
+                        image_data.append({'url': image_url, 'prompt': p})
+                        story_data['images'] = image_data
+                        # Save progress within the loop for resumability
+                        save_progress(3, {'story_data': story_data, 'image_prompts': image_prompts})
+                        progress = 40 + int(30 * (i + 1) / num_prompts)
+                        yield progress_update(f'Generated image {i + 1} of {num_prompts}', progress, 100, story_data)
+                else:
+                    story_data['images'] = [{'prompt': p, 'url': None} for p in image_prompts]
+                    yield progress_update('Skipping image generation', 70, 100)
+                
+                save_progress(4, {'story_data': story_data, 'image_prompts': image_prompts})
+                step = 4
+            elif step == 4:
+                # 6. Generate audio files
+                yield progress_update('Generating audio files...', 75, 100)
+                audio_files = story_data.get('audio_files', [])
+                texts_to_voice = [story_data['title']] + story_data['paragraphs']
+                num_texts = len(texts_to_voice)
+                start_index = len(audio_files)
+                for i, text in enumerate(texts_to_voice[start_index:], start=start_index):
+                    audio_url = await generate_voice(text)
+                    audio_files.append(audio_url)
+                    story_data['audio_files'] = audio_files
+                    await asyncio.sleep(1)
+                    # Save progress within the loop for resumability
+                    save_progress(4, {'story_data': story_data, 'image_prompts': image_prompts})
+                    progress = 75 + int(20 * (i + 1) / num_texts)
+                    yield progress_update(f'Generated audio {i + 1} of {num_texts}', progress, 100, {'audio_file': audio_url, 'index': i})
+
+                save_progress(5, {'story_data': story_data, 'image_prompts': image_prompts})
+                step = 5
+            elif step == 5:
+                # Finalize
+                story_data['email'] = email
+                story_data['story_uuid'] = story_uuid
+                story_data['public'] = public
+                add_response = shov_add('stories', story_data)
+                if not add_response.get('success'):
+                    error_details = add_response.get('details', 'No details provided.')
+                    print(f"CRITICAL: Failed to save story to history. Error: {add_response.get('error')}. Details: {error_details}")
+                
+                if shov_id:
+                    shov_remove('stream_progress', shov_id)
+                yield progress_update('Finished!', 100, 100, story_data)
+                step = 6
         
     except Exception as e:
         print(f"Error in generate_story_for_stream: {str(e)}")
@@ -1170,28 +1269,48 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
 
 @app.route('/generate_story_stream', methods=['GET'])
 def generate_story_stream():
-    prompt = request.args.get('prompt')
-    image_mode = request.args.get('imageMode', 'generate')
-    public = request.args.get('public') == 'true'
-    min_paragraphs = int(request.args.get('minParagraphs', 15))
-    max_paragraphs = int(request.args.get('maxParagraphs', 20))
-    email = session.get('email')
+    try:
+        prompt = request.args.get('prompt')
+        if not prompt:
+            raise ValueError("A story prompt is required.")
 
-    def generate():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            gen = generate_story_for_stream(prompt, image_mode, min_paragraphs, max_paragraphs, email, public)
-            while True:
-                try:
-                    progress = loop.run_until_complete(gen.__anext__())
-                    yield f"data: {json.dumps(progress)}\n\n"
-                except StopAsyncIteration:
-                    break
-        finally:
-            loop.close()
+        image_mode = request.args.get('imageMode', 'generate')
+        public = request.args.get('public') == 'true'
+        min_paragraphs = int(request.args.get('minParagraphs', 15))
+        max_paragraphs = int(request.args.get('maxParagraphs', 20))
+        email = session.get('email')
+        story_uuid = request.args.get('story_uuid')
 
-    return Response(generate(), mimetype='text/event-stream')
+        def generate():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                gen = generate_story_for_stream(prompt, image_mode, min_paragraphs, max_paragraphs, email, public, story_uuid)
+                while True:
+                    try:
+                        progress = loop.run_until_complete(gen.__anext__())
+                        yield f"data: {json.dumps(progress)}\n\n"
+                    except StopAsyncIteration:
+                        break
+            finally:
+                loop.close()
+
+        return Response(generate(), mimetype='text/event-stream')
+
+    except Exception as e:
+        print(f"Error in generate_story_stream setup: {e}")
+        traceback.print_exc()
+        
+        def error_generate():
+            error_payload = {
+                "task": "Error", 
+                "progress": 100, 
+                "total": 100, 
+                "data": {"error": f"A server setup error occurred: {str(e)}"}
+            }
+            yield f"data: {json.dumps(error_payload)}\n\n"
+
+        return Response(error_generate(), mimetype='text/event-stream')
 
 
 from xhtml2pdf import pisa

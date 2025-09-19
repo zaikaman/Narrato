@@ -21,7 +21,11 @@
     <div id="storybook" class="hidden">
         <a href="{{ url_for('index') }}" class="back-button-mobile">&larr;</a>
         <div id="page-container"></div>
-        <div id="page-number"></div>
+                <div id="page-number">
+            <span id="current-page"></span>
+            <span>/</span>
+            <span id="total-pages"></span>
+        </div>
         <button id="prev-btn" class="pixel-button">&larr;</button>
         <button id="next-btn" class="pixel-button">&rarr;</button>
         <div class="actions">
