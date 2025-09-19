@@ -253,3 +253,15 @@ body {
     font-size: 1.2em;
     text-shadow: 2px 2px #000;
 }
+
+#custom-driver-overlay {
+    display: none;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    background: #000;
+    opacity: 0.75;
+    z-index: 10000;
+}

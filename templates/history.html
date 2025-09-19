@@ -4,6 +4,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Story History</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <style>
@@ -63,6 +64,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='narrator.css') }}">
 </head>
 <body>
+    <div id="custom-driver-overlay"></div>
     <div class="header">
         <a href="{{ url_for('index') }}" class="back-button">← Home</a>
         <h1 class="header-title">Your Stories</h1>

@@ -48,7 +48,7 @@
 
 .driver-narrator {
     position: fixed;
-    bottom: 20px;
+    bottom: 0px;
     left: 20px;
     width: 200px;
     height: auto;

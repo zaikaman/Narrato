@@ -50,7 +50,7 @@ body {
     box-sizing: border-box;
 }
 
-.pixel-button {
+.story-form-container .pixel-button {
     background-color: #4CAF50; /* A classic green */
     color: white;
     padding: 10px 20px;
@@ -88,7 +88,7 @@ body {
         font-size: 1.2rem;
     }
 
-    .pixel-button {
+    .story-form-container .pixel-button {
         padding: 1.2rem;
         font-size: 1.2rem;
     }

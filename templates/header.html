@@ -7,7 +7,7 @@
     </div>
     <div class="flex items-center">
         {% if show_browse_button %}
-        <a href="{{ url_for('browse_stories') }}" class="pixel-button">Browse</a>
+        <a href="{{ url_for('browse_stories') }}" id="browse-button" class="pixel-button">Browse</a>
         {% endif %}
         {% if session['email'] %}
             <div class="dropdown ml-4">

@@ -14,6 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
+    <div id="custom-driver-overlay"></div>
     {% include 'header.html' with context %}
     <div class="container mx-auto px-4 py-8">
         
@@ -177,5 +178,15 @@
 
     <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
+
+    <div id="manual-final-tip" class="driver-popover-item" style="display: none; z-index: 999999;">
+        <h3 class="driver-popover-title">One Last Tip!</h3>
+        <div class="driver-popover-description">
+            This is great, but it's even better to log in! After logging in, you get your own private history of all the stories you've created.
+        </div>
+        <div class="driver-popover-footer">
+            <button id="manual-tip-close" class="pixel-button">Close</button>
+        </div>
+    </div>
 </body>
 </html> 
