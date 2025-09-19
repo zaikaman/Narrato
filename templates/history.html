@@ -59,6 +59,8 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='driver.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='narrator.css') }}">
 </head>
 <body>
     <div class="header">
@@ -150,11 +152,14 @@
             });
         }
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
+        (function() {
+            var flashedMessages = JSON.parse('{{ get_flashed_messages(with_categories=true) | tojson | safe }}');
+            if (flashedMessages) {
+                for (var i = 0; i < flashedMessages.length; i++) {
+                    var category = flashedMessages[i][0];
+                    var message = flashedMessages[i][1];
                     Toastify({
-                        text: "{{ message }}",
+                        text: message,
                         duration: 3000,
                         close: true,
                         gravity: "top",
@@ -164,10 +169,13 @@
                             fontFamily: '"Press Start 2P", cursive'
                         }
                     }).showToast();
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+                }
+            }
+        })();
     </script>
     <script src="{{ url_for('static', filename='main.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
 </body>
 </html>

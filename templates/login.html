@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Login</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='driver.min.css') }}">
 </head>
 <body>
     <div class="story-form-container">
@@ -16,5 +16,8 @@
         </form>
     </div>
     <script src="{{ url_for('static', filename='main.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
 </body>
 </html>

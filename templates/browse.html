@@ -20,11 +20,12 @@
             color: #000;
         }
     </style>
-    
+    <link rel="stylesheet" href="{{ url_for('static', filename='driver.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='narrator.css') }}">
 </head>
 <body>
+    {% include 'header.html' with context %}
     <div class="container mx-auto px-4 py-8">
-        {% include 'header.html' with context %}
 
         <h1 class="text-4xl text-center mb-8 pixel-font">Browse Public Stories</h1>
 
@@ -45,5 +46,8 @@
             {% endfor %}
         </div>
     </div>
+
+    <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
 </body>
 </html>

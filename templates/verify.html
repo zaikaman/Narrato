@@ -6,6 +6,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='driver.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='narrator.css') }}">
 </head>
 <body>
     <div class="story-form-container">
@@ -41,5 +43,8 @@
         }
     </script>
     <script src="{{ url_for('static', filename='main.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
 </body>
 </html>

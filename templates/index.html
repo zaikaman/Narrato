@@ -9,11 +9,13 @@
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='game.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='driver.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='narrator.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
+    {% include 'header.html' with context %}
     <div class="container mx-auto px-4 py-8">
-        {% include 'header.html' with context %}
         
         <div class="max-w-4xl mx-auto story-form-container p-6">
             <form id="storyForm" class="space-y-4">
@@ -172,5 +174,8 @@
 
     <script src="{{ url_for('static', filename='main.js') }}"></script>
     <script src="{{ url_for('static', filename='game.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
 </body>
 </html> 

@@ -388,3 +388,16 @@ body {
 .pixel-font-popup {
     font-family: 'Press Start 2P', cursive !important;
 }
+
+.tour-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+@media (max-width: 768px) {
+    .tour-button {
+        display: none;
+    }
+}

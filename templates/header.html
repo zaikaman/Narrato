@@ -1,4 +1,4 @@
-<div class="flex justify-between items-center mb-8">
+<div class="flex justify-between items-center mb-8" style="margin-top: 32px; padding: 0 16px;">
     <div class="flex items-center">
         <a href="{{ url_for('index') }}" class="flex items-center">
             <img src="/static/images/logo.png" alt="Logo" class="h-16">
@@ -13,7 +13,7 @@
             <div class="dropdown ml-4">
                 <button class="pixel-button">Account</button>
                 <div class="dropdown-content">
-                    <a href="{{ url_for('story_history') }}">Story History</a>
+                    <a href="{{ url_for('story_history') }}" id="history-button">Story History</a>
                 </div>
             </div>
             <a href="{{ url_for('logout') }}" class="ml-4 pixel-button logout-button">Logout</a>
