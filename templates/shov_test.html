@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shov.com API Test Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; }
+        .test-container { background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        #result { white-space: pre-wrap; background-color: #2d2d2d; color: #f2f2f2; border-radius: 4px; }
+        .btn { transition: background-color 0.3s; }
+    </style>
+</head>
+<body class="p-8">
+    <h1 class="text-3xl font-bold text-center mb-8">Shov.com API Test Page</h1>
+
+    <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Actions -->
+        <div class="space-y-6">
+            <!-- Set/Get -->
+            <div class="test-container p-6">
+                <h2 class="text-xl font-semibold mb-4">Set / Get (Key-Value)</h2>
+                <div class="space-y-4">
+                    <input id="sg-key" type="text" placeholder="Key" class="w-full p-2 border rounded">
+                    <textarea id="sg-value" placeholder="Value (string)" class="w-full p-2 border rounded" rows="3"></textarea>
+                    <div class="flex space-x-4">
+                        <button onclick="testSet()" class="flex-1 bg-blue-500 text-white p-2 rounded btn hover:bg-blue-600">Set</button>
+                        <button onclick="testGet()" class="flex-1 bg-green-500 text-white p-2 rounded btn hover:bg-green-600">Get</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collections -->
+            <div class="test-container p-6">
+                <h2 class="text-xl font-semibold mb-4">Collections (Add / Where / Remove)</h2>
+                <div class="space-y-4">
+                    <input id="c-name" type="text" placeholder="Collection Name" class="w-full p-2 border rounded">
+                    <textarea id="c-value" placeholder='Value (must be JSON, e.g., {"name": "test"})' class="w-full p-2 border rounded" rows="3"></textarea>
+                    <button onclick="testAdd()" class="w-full bg-blue-500 text-white p-2 rounded btn hover:bg-blue-600">Add to Collection</button>
+                    <hr>
+                    <textarea id="c-filter" placeholder='Filter (must be JSON, e.g., {"name": "test"})' class="w-full p-2 border rounded" rows="2"></textarea>
+                    <button onclick="testWhere()" class="w-full bg-green-500 text-white p-2 rounded btn hover:bg-green-600">Where in Collection</button>
+                    <hr>
+                    <input id="c-remove-id" type="text" placeholder="Item ID to Remove" class="w-full p-2 border rounded">
+                    <button onclick="testRemove()" class="w-full bg-red-500 text-white p-2 rounded btn hover:bg-red-600">Remove from Collection</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result -->
+        <div class="test-container p-6">
+            <h2 class="text-xl font-semibold mb-4">Result</h2>
+            <pre id="result" class="p-4 text-sm">Awaiting test...</pre>
+        </div>
+    </div>
+
+    <script>
+        const resultEl = document.getElementById('result');
+
+        async function apiCall(endpoint, body) {
+            resultEl.textContent = 'Loading...';
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                resultEl.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        function testSet() {
+            const key = document.getElementById('sg-key').value;
+            const value = document.getElementById('sg-value').value;
+            apiCall('/api/shov/set', { key, value });
+        }
+
+        function testGet() {
+            const key = document.getElementById('sg-key').value;
+            apiCall('/api/shov/get', { key });
+        }
+
+        function testAdd() {
+            const collection = document.getElementById('c-name').value;
+            const value = document.getElementById('c-value').value;
+            apiCall('/api/shov/add', { collection, value });
+        }
+
+        function testWhere() {
+            const collection = document.getElementById('c-name').value;
+            const filter = document.getElementById('c-filter').value;
+            apiCall('/api/shov/where', { collection, filter });
+        }
+
+        function testRemove() {
+            const collection = document.getElementById('c-name').value;
+            const item_id = document.getElementById('c-remove-id').value;
+            apiCall('/api/shov/remove', { collection, item_id });
+        }
+    </script>
+</body>
+</html>

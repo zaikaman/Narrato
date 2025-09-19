@@ -378,3 +378,13 @@ body {
     box-shadow: 2px 2px #000; /* Less prominent shadow */
     transform: translate(2px, 2px);
 }
+
+#cancel-generation-btn {
+    width: 100%;
+    display: block; /* Make it a block to take full width */
+}
+
+/* Custom SweetAlert2 styling */
+.pixel-font-popup {
+    font-family: 'Press Start 2P', cursive !important;
+}

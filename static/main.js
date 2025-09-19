@@ -18,10 +18,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewStoryBtn = document.getElementById('view-story-btn');
     const promptModal = document.getElementById('promptModal');
     const closeModalBtn = document.querySelector('.close');
+    const cancelBtn = document.getElementById('cancel-generation-btn');
 
     const activeStreamTaskKey = 'activeStreamTask';
+    let currentEventSource = null; // To hold the active EventSource
 
     // --- Core Functions ---
+
+    function resetUI() {
+        if (currentEventSource) {
+            currentEventSource.close();
+            currentEventSource = null;
+        }
+        // Add logic here for stopping polling if/when implemented
+
+        toggleForm(false);
+        loading.classList.add('hidden');
+        cancelBtn.classList.add('hidden');
+        localStorage.removeItem(activeStreamTaskKey);
+        localStorage.removeItem('activeTaskUUID'); // Also clear production task
+        updateProgress('Cancelled', 0, 100);
+        console.log("Story generation cancelled.");
+    }
+
 
     function toggleForm(disabled) {
         const elements = [
@@ -157,14 +176,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Local/Heroku (Streaming) Functions ---
     function startStreaming(taskDetails) {
         const params = new URLSearchParams(taskDetails);
-        const eventSource = new EventSource(`/generate_story_stream?${params.toString()}`);
+        currentEventSource = new EventSource(`/generate_story_stream?${params.toString()}`);
 
-        eventSource.onmessage = function(event) {
+        currentEventSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
 
             if (data.error) {
                 alert('An error occurred while creating the story: ' + data.error);
-                eventSource.close();
+                currentEventSource.close();
                 toggleForm(false);
                 localStorage.removeItem(activeStreamTaskKey);
                 window.location.reload();
@@ -175,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             updateAllTaskStatuses(data.progress);
             
                             if (data.task === 'Finished!') {
-                                displayResults(data.data);                eventSource.close();
+                                displayResults(data.data);                currentEventSource.close();
                 localStorage.removeItem(activeStreamTaskKey);
                 toggleForm(false);
                 loading.classList.add('hidden');
@@ -184,9 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        eventSource.onerror = function(err) {
+        currentEventSource.onerror = function(err) {
             console.error("EventSource connection failed. This is the final error handler.", err);
-            eventSource.close();
+            currentEventSource.close();
         };
     }
 
@@ -194,6 +213,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     storyForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        Swal.fire({
+            title: 'Heads up!',
+            text: 'We do not recommend closing or refreshing this page during story generation.',
+            icon: 'info',
+            confirmButtonText: 'Got it!',
+            background: '#2a2a2a',
+            color: '#ffffff',
+            customClass: {
+                popup: 'pixel-font-popup',
+                title: 'pixel-font-popup',
+                htmlContainer: 'pixel-font-popup',
+                confirmButton: 'pixel-font-popup',
+            }
+        });
 
         const formData = new FormData(e.target);
         const prompt = formData.get('prompt');
@@ -204,6 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         toggleForm(true);
         loading.classList.remove('hidden');
+        cancelBtn.classList.remove('hidden');
         result.classList.add('hidden');
         gamePrompt.classList.remove('hidden');
         updateProgress('Initializing story generation...', 0, 100);
@@ -296,6 +331,24 @@ document.addEventListener('DOMContentLoaded', () => {
     closeModalBtn.onclick = function() {
         promptModal.style.display = 'none';
     }
+
+    cancelBtn.addEventListener('click', () => {
+        resetUI();
+        // Optionally, show a confirmation message
+        Swal.fire({
+            title: 'Cancelled',
+            text: 'Story generation has been stopped.',
+            icon: 'error',
+            background: '#2a2a2a',
+            color: '#ffffff',
+            customClass: {
+                popup: 'pixel-font-popup',
+                title: 'pixel-font-popup',
+                htmlContainer: 'pixel-font-popup',
+                confirmButton: 'pixel-font-popup',
+            }
+        });
+    });
 
     window.onclick = function(event) {
         if (event.target == promptModal) {

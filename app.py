@@ -28,6 +28,21 @@ SHOV_API_KEY = os.getenv("SHOV_API_KEY")
 PROJECT_NAME = os.getenv("SHOV_PROJECT", "narrato")
 SHOV_API_URL = f"https://shov.com/api"
 
+import time
+
+def _shov_request_with_retry(url, headers, json_data=None, max_retries=3, delay=1):
+    """Wrapper for requests.post with retry logic for connection errors."""
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, headers=headers, json=json_data)
+            response.raise_for_status()
+            return response
+        except (requests.exceptions.RequestException, ConnectionResetError) as e:
+            print(f"--- Shov Request --- WARN: Attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt + 1 == max_retries:
+                raise  # Re-raise the last exception
+            time.sleep(delay)
+
 def shov_set(key, value):
     """Store a key-value pair in the shov.com database."""
     headers = {
@@ -36,10 +51,9 @@ def shov_set(key, value):
     }
     data = {"key": key, "value": value}
     try:
-        response = requests.post(f"{SHOV_API_URL}/set/{PROJECT_NAME}", headers=headers, json=data)
-        response.raise_for_status()
+        response = _shov_request_with_retry(f"{SHOV_API_URL}/set/{PROJECT_NAME}", headers=headers, json_data=data)
         return response.json()
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, ConnectionResetError) as e:
         print(f"--- Shov Set --- FATAL: RequestException: {e}")
         return {"success": False, "error": "RequestException", "details": str(e)}
     except json.JSONDecodeError:
@@ -53,10 +67,9 @@ def shov_get(key):
     }
     data = {"key": key}
     try:
-        response = requests.post(f"{SHOV_API_URL}/get/{PROJECT_NAME}", headers=headers, json=data)
-        response.raise_for_status()
+        response = _shov_request_with_retry(f"{SHOV_API_URL}/get/{PROJECT_NAME}", headers=headers, json_data=data)
         return response.json()
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, ConnectionResetError) as e:
         print(f"--- Shov Get --- FATAL: RequestException: {e}")
         return {"success": False, "error": "RequestException", "details": str(e)}
     except json.JSONDecodeError:
@@ -67,8 +80,12 @@ def shov_contents():
     headers = {
         "Authorization": f"Bearer {SHOV_API_KEY}",
     }
-    response = requests.post(f"{SHOV_API_URL}/contents/{PROJECT_NAME}", headers=headers)
-    return response.json()
+    try:
+        response = _shov_request_with_retry(f"{SHOV_API_URL}/contents/{PROJECT_NAME}", headers=headers)
+        return response.json()
+    except (requests.exceptions.RequestException, ConnectionResetError) as e:
+        print(f"--- Shov Contents --- FATAL: RequestException: {e}")
+        return {"success": False, "error": "RequestException", "details": str(e)}
 
 def shov_add(collection_name, value):
     """Add a JSON object to a collection."""
@@ -79,12 +96,12 @@ def shov_add(collection_name, value):
     data = {"name": collection_name, "value": value}
     print(f"--- Shov Add --- PRE-REQUEST: Adding to collection '{collection_name}'")
     try:
-        response = requests.post(f"{SHOV_API_URL}/add/{PROJECT_NAME}", headers=headers, json=data)
+        response = _shov_request_with_retry(f"{SHOV_API_URL}/add/{PROJECT_NAME}", headers=headers, json_data=data)
         print(f"--- Shov Add --- POST-REQUEST: Status Code: {response.status_code}")
         response_json = response.json()
         print(f"--- Shov Add --- POST-REQUEST: JSON Response: {response_json}")
         return response_json
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, ConnectionResetError) as e:
         print(f"--- Shov Add --- FATAL: RequestException: {e}")
         return {"success": False, "error": "RequestException", "details": str(e)}
     except json.JSONDecodeError:
@@ -101,10 +118,9 @@ def shov_where(collection_name, filter_dict=None):
         data['filter'] = filter_dict
     
     try:
-        response = requests.post(f"{SHOV_API_URL}/where/{PROJECT_NAME}", headers=headers, json=data)
-        response.raise_for_status()
+        response = _shov_request_with_retry(f"{SHOV_API_URL}/where/{PROJECT_NAME}", headers=headers, json_data=data)
         return response.json()
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, ConnectionResetError) as e:
         print(f"--- Shov Where --- FATAL: RequestException: {e}")
         return {"success": False, "error": "RequestException", "details": str(e), "items": []}
     except json.JSONDecodeError:
@@ -118,9 +134,13 @@ def shov_send_otp(email):
         "Content-Type": "application/json"
     }
     data = {"identifier": email}
-    response = requests.post(f"{SHOV_API_URL}/send-otp/{PROJECT_NAME}", headers=headers, json=data)
-    print(f"shov_send_otp response: {response.json()}")
-    return response.json()
+    try:
+        response = _shov_request_with_retry(f"{SHOV_API_URL}/send-otp/{PROJECT_NAME}", headers=headers, json_data=data)
+        print(f"shov_send_otp response: {response.json()}")
+        return response.json()
+    except (requests.exceptions.RequestException, ConnectionResetError) as e:
+        print(f"--- Shov Send OTP --- FATAL: {e}")
+        return {"success": False, "error": str(e)}
 
 def shov_verify_otp(email, pin):
     """Verify the OTP provided by the user."""
@@ -129,8 +149,12 @@ def shov_verify_otp(email, pin):
         "Content-Type": "application/json"
     }
     data = {"identifier": email, "pin": pin}
-    response = requests.post(f"{SHOV_API_URL}/verify-otp/{PROJECT_NAME}", headers=headers, json=data)
-    return response.json()
+    try:
+        response = _shov_request_with_retry(f"{SHOV_API_URL}/verify-otp/{PROJECT_NAME}", headers=headers, json_data=data)
+        return response.json()
+    except (requests.exceptions.RequestException, ConnectionResetError) as e:
+        print(f"--- Shov Verify OTP --- FATAL: {e}")
+        return {"success": False, "error": str(e)}
 
 def shov_remove(collection_name, item_id):
     """Remove an item from a collection by its ID, with robust error handling."""
@@ -141,7 +165,7 @@ def shov_remove(collection_name, item_id):
         }
         data = {"collection": collection_name}
         print(f"--- Shov Remove --- PRE-REQUEST: Deleting {item_id} from {collection_name}")
-        response = requests.post(f"{SHOV_API_URL}/remove/{PROJECT_NAME}/{item_id}", headers=headers, json=data)
+        response = _shov_request_with_retry(f"{SHOV_API_URL}/remove/{PROJECT_NAME}/{item_id}", headers=headers, json_data=data)
         
         print(f"--- Shov Remove --- POST-REQUEST: Status Code: {response.status_code}")
         print(f"--- Shov Remove --- POST-REQUEST: Raw Response Text: {response.text[:500]}")
@@ -154,7 +178,7 @@ def shov_remove(collection_name, item_id):
         else:
             return {"success": False, "error": f"API returned status {response.status_code}", "details": response.text[:500]}
 
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, ConnectionResetError) as e:
         print(f"--- Shov Remove --- FATAL: RequestException: {e}")
         return {"success": False, "error": "RequestException", "details": str(e)}
     except Exception as e:
@@ -168,8 +192,12 @@ def shov_forget(key):
         "Content-Type": "application/json"
     }
     data = {"key": key}
-    response = requests.post(f"{SHOV_API_URL}/forget/{PROJECT_NAME}", headers=headers, json=data)
-    return response.json()
+    try:
+        response = _shov_request_with_retry(f"{SHOV_API_URL}/forget/{PROJECT_NAME}", headers=headers, json_data=data)
+        return response.json()
+    except (requests.exceptions.RequestException, ConnectionResetError) as e:
+        print(f"--- Shov Forget --- FATAL: {e}")
+        return {"success": False, "error": str(e)}
 
 class APIKeyManager:
     """Manages and rotates API keys"""
@@ -1361,5 +1389,73 @@ def export_pdf(story_uuid):
 
 
 
+
+# --- Shov.com Test Endpoints ---
+
+@app.route('/shov-test')
+def shov_test_page():
+    """Render the Shov.com testing page."""
+    return render_template('shov_test.html')
+
+@app.route('/api/shov/set', methods=['POST'])
+def api_shov_set():
+    data = request.get_json()
+    key = data.get('key')
+    value = data.get('value')
+    if not key or value is None:
+        return jsonify({"success": False, "error": "Key and value are required."}), 400
+    result = shov_set(key, value)
+    return jsonify(result)
+
+@app.route('/api/shov/get', methods=['POST'])
+def api_shov_get():
+    data = request.get_json()
+    key = data.get('key')
+    if not key:
+        return jsonify({"success": False, "error": "Key is required."}), 400
+    result = shov_get(key)
+    return jsonify(result)
+
+@app.route('/api/shov/add', methods=['POST'])
+def api_shov_add():
+    data = request.get_json()
+    collection = data.get('collection')
+    value = data.get('value')
+    if not collection or value is None:
+        return jsonify({"success": False, "error": "Collection and value are required."}), 400
+    try:
+        # Ensure value is a dict if it's a string
+        if isinstance(value, str):
+            value = json.loads(value)
+    except json.JSONDecodeError:
+        return jsonify({"success": False, "error": "Value must be a valid JSON object."}), 400
+    result = shov_add(collection, value)
+    return jsonify(result)
+
+@app.route('/api/shov/where', methods=['POST'])
+def api_shov_where():
+    data = request.get_json()
+    collection = data.get('collection')
+    filter_str = data.get('filter', '{}')
+    if not collection:
+        return jsonify({"success": False, "error": "Collection is required."}), 400
+    try:
+        filter_dict = json.loads(filter_str)
+    except json.JSONDecodeError:
+        return jsonify({"success": False, "error": "Filter must be a valid JSON object string."}), 400
+    result = shov_where(collection, filter_dict)
+    return jsonify(result)
+
+@app.route('/api/shov/remove', methods=['POST'])
+def api_shov_remove():
+    data = request.get_json()
+    collection = data.get('collection')
+    item_id = data.get('item_id')
+    if not collection or not item_id:
+        return jsonify({"success": False, "error": "Collection and item_id are required."}), 400
+    result = shov_remove(collection, item_id)
+    return jsonify(result)
+
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
+
