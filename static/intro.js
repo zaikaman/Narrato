@@ -1,4 +1,7 @@
 window.onload = function () {
+    if (window.innerWidth <= 768) {
+        return;
+    }
     console.log('intro.js loaded');
     const introOverlay = document.getElementById('intro-overlay');
     const startTourBtn = document.getElementById('start-tour-btn');
