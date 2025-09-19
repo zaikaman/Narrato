@@ -479,6 +479,9 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         
         # Remove markdown code blocks
         response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
+
+        # Remove trailing commas before closing brackets and braces
+        response_text = re.sub(r',(\s*[\\]}])', r'\\1', response_text)
         
         print(f"Cleaned response: {response_text}")
         
