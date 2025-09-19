@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Core Functions ---
 
     function resetUI() {
+        sessionStorage.removeItem('isSubmitting'); // Reset submission guard
         if (currentEventSource) {
             currentEventSource.close();
             currentEventSource = null;
@@ -192,7 +193,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             updateAllTaskStatuses(data.progress);
             
                             if (data.task === 'Finished!') {
-                                displayResults(data.data);                currentEventSource.close();
+                                sessionStorage.removeItem('isSubmitting'); // Reset submission guard
+                                displayResults(data.data);
+                                currentEventSource.close();
                 localStorage.removeItem(activeStreamTaskKey);
                 toggleForm(false);
                 loading.classList.add('hidden');
@@ -203,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentEventSource.onerror = function(err) {
             console.error("EventSource connection failed. This is the final error handler.", err);
+            sessionStorage.removeItem('isSubmitting'); // Reset submission guard
             currentEventSource.close();
         };
     }
@@ -211,6 +215,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     storyForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        if (sessionStorage.getItem('isSubmitting') === 'true') {
+            console.warn("Submission blocked: a story is already being generated.");
+            return;
+        }
+        sessionStorage.setItem('isSubmitting', 'true');
 
         Swal.fire({
             title: 'Heads up!',
@@ -264,6 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (startError) {
                 console.error("Starting generation failed:", startError);
                 alert(startError.message);
+                sessionStorage.removeItem('isSubmitting'); // Reset submission guard
                 toggleForm(false);
                 window.location.reload();
             }

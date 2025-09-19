@@ -411,7 +411,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         genai.configure(api_key=api_key)
         print("Initialized Gemini model with new API key")
         
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash-lite')
         print("Sending story creation request...")
         
         english_story_response = None
@@ -533,7 +533,7 @@ async def generate_style_guide(story_data):
     try:
         api_key = await api_key_manager.get_next_key()
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash-lite')
         
         style_guide_response = None
         for i in range(len(api_key_manager.keys)):
@@ -588,7 +588,7 @@ async def generate_style_guide(story_data):
 async def analyze_story_characters(story_data):
     """Analyze and create consistent descriptions for all characters in the story"""
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash-lite')
         
         for i in range(len(api_key_manager.keys)): # Retry for each key
             try:
@@ -683,7 +683,7 @@ async def generate_all_image_prompts(story_data):
         genai.configure(api_key=api_key)
         print("Using new API key for generate_all_image_prompts")
         
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash-lite')
         
         char_db = story_data.get('character_database', {})
         style_data = story_data.get('style_guide')
