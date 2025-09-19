@@ -29,3 +29,11 @@
     text-shadow: 2px 2px #000;
     z-index: 2;
 }
+
+#title-screen {
+    padding: 0 1rem; /* Add some horizontal padding */
+}
+
+#title-screen h1 {
+    font-size: 2.5em; /* Reduce font size for mobile */
+}
