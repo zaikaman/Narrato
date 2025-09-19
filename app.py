@@ -1229,7 +1229,11 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
                 style_task = generate_style_guide(story_data)
                 chars_task = analyze_story_characters(story_data)
                 
-                gather_task = asyncio.create_task(asyncio.gather(style_task, chars_task))
+                # Wrap gather in a coroutine so create_task can accept it
+                async def gather_elements():
+                    return await asyncio.gather(style_task, chars_task)
+
+                gather_task = asyncio.create_task(gather_elements())
                 while not gather_task.done():
                     try:
                         await asyncio.wait_for(asyncio.shield(gather_task), timeout=15)
