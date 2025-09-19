@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Step Definitions ---
     const indexPageSteps = [
         { element: '#prompt', popover: { title: 'Create a Story', description: 'First, enter the theme or a short description of the story you want to create.', side: 'bottom' } },
-        { element: 'input[name="minParagraphs"]', popover: { title: 'Number of Pages', description: 'Choose the minimum and maximum number of pages for your story.', side: 'bottom' } },
+        { element: '.grid.grid-cols-1 > div:nth-child(1)', popover: { title: 'Number of Pages', description: 'Choose the minimum and maximum number of pages for your story.', side: 'bottom' } },
         { element: 'input[name="imageMode"]', popover: { title: 'Image Generation', description: 'You can choose to generate images for your story or just the text.', side: 'top' } },
         { element: '#public', popover: { title: 'Make it Public', description: 'Check this box if you want to share your story with the community.', side: 'top' } },
         { element: 'button[type="submit"]', popover: { title: 'Generate Story', description: 'Once you are ready, click here to generate your story.', side: 'top' } },

@@ -29,3 +29,5 @@ This document outlines the context and operating instructions for the Gemini AI 
 *   **Cloud Storage:** Cloudinary
 *   **Frontend:** Standard HTML, CSS, JavaScript with templates managed by Flask.
 *   **Deployment:** Configured for services like Heroku or Vercel (`Procfile`, `vercel.json`).
+
+Also, do not try to run flask or app.py commands, the user wants to run the app by themselves.

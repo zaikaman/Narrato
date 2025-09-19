@@ -1345,6 +1345,27 @@ from xhtml2pdf import pisa
 from io import BytesIO
 import requests
 import base64
+from pathlib import Path
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+def link_callback(uri, rel):
+    """
+    Convert HTML URIs to absolute system paths so xhtml2pdf can access those
+    resources
+    """
+    static_root = os.path.join(os.path.dirname(__file__), 'static')
+    
+    uri_parts = uri.split('/')
+    path_str = os.path.join(static_root, *uri_parts)
+
+    if os.path.exists(path_str):
+        return Path(path_str).as_uri()
+    
+    if uri.startswith("data:"):
+        return uri
+
+    return uri
 
 @app.route('/export_pdf/<story_uuid>')
 def export_pdf(story_uuid):
@@ -1354,18 +1375,31 @@ def export_pdf(story_uuid):
     if stories:
         story = stories[0]['value']
 
+        # Register fonts
+        static_path = os.path.join(os.path.dirname(__file__), 'static')
+        medieval_font_path = os.path.join(static_path, 'MedievalSharp', 'MedievalSharp-Regular.ttf')
+        literata_font_path = os.path.join(static_path, 'Literata', 'Literata-VariableFont_opsz,wght.ttf')
+        
+        if os.path.exists(medieval_font_path):
+            pdfmetrics.registerFont(TTFont('MedievalSharp', medieval_font_path))
+        if os.path.exists(literata_font_path):
+            pdfmetrics.registerFont(TTFont('Literata', literata_font_path))
+
         # Download images and convert to data URIs
         if 'images' in story:
             for image_data in story['images']:
-                if image_data.get('url'):
+                if image_data.get('url') and image_data['url'].startswith('http'):
                     try:
                         response = requests.get(image_data['url'], timeout=10)
                         response.raise_for_status()
+                        
+                        content_type = response.headers.get('Content-Type', 'image/jpeg')
                         encoded_string = base64.b64encode(response.content).decode('utf-8')
-                        image_data['url'] = f"data:image/jpeg;base64,{encoded_string}"
+                        
+                        image_data['url'] = f"data:{content_type};base64,{encoded_string}"
                     except requests.exceptions.RequestException as e:
                         print(f"Could not fetch image {image_data['url']}: {e}")
-                        image_data['url'] = '' # Set to empty if download fails
+                        image_data['url'] = '' 
 
         html = render_template('pdf_template.html', story=story)
         
@@ -1373,10 +1407,12 @@ def export_pdf(story_uuid):
         pisa_status = pisa.CreatePDF(
             BytesIO(html.encode('UTF-8')),
             dest=pdf_file,
-            encoding='UTF-8'
+            encoding='UTF-8',
+            link_callback=link_callback
         )
 
         if pisa_status.err:
+            print(f"PDF creation error: {pisa_status.err}")
             return "Error creating PDF", 500
 
         pdf_file.seek(0)
