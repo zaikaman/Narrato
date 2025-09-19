@@ -5,10 +5,10 @@
     <title>Verify OTP</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='driver.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='narrator.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/driver.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/narrator.css') }}">
 </head>
 <body>
     <div id="custom-driver-overlay"></div>
@@ -20,33 +20,12 @@
             <input type="text" id="otp" name="pin" required>
             <input type="submit" value="Verify" class="pixel-button">
         </form>
-        <div id="flash-messages" data-messages="{{ get_flashed_messages(with_categories=true)|tojson }}" style="display: none;"></div>
+        <div id="flash-messages" data-messages="{{ get_flashed_messages(with_categories=true)|tojson }}"></div>
         <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-    <script>
-        const messagesDiv = document.getElementById('flash-messages');
-        const messagesData = messagesDiv.getAttribute('data-messages');
-        if (messagesData) {
-            const messages = JSON.parse(messagesData);
-            if (messages) {
-                messages.forEach(function(message) {
-                    Toastify({
-                        text: message[1],
-                        duration: 3000,
-                        close: true,
-                        gravity: "top",
-                        position: "right",
-                        style: {
-                            background: 'linear-gradient(to right, #ff5f6d, #ffc371)',
-                            fontFamily: '"Press Start 2P", cursive'
-                        }
-                    }).showToast();
-                });
-            }
-        }
-    </script>
-    <script src="{{ url_for('static', filename='main.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/verify.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-    <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/driver.min.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/tour.js') }}"></script>
 </body>
 </html>

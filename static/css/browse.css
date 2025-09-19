@@ -1,0 +1,11 @@
+body {
+            font-family: 'Press Start 2P', cursive;
+            background-image: url('/static/images/background.jpg');
+            color: #fff;
+        }
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+        .story-card {
+            color: #000;
+        }

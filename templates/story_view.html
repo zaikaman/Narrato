@@ -4,13 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{{ story.title }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='storybook.css') }}">
+    {% block head %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/storybook.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/narrator.css') }}">
+    {% endblock %}
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" media="(max-width: 800px)" href="{{ url_for('static', filename='mobile.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='driver.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='narrator.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/driver.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/narrator.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/story_view.css') }}">
 </head>
 <body>
     <div id="custom-driver-overlay"></div>
@@ -36,7 +40,7 @@
             <a href="{{ url_for('export_pdf', story_uuid=story.story_uuid) }}" class="pixel-button"><i class="fas fa-file-pdf"></i><span class="tooltiptext">Export to PDF</span></a>
         </div>
     </div>
-    <input type="text" id="share-link" value="{{ request.url }}" style="position: absolute; left: -9999px;">
+    <input type="text" id="share-link" value="{{ request.url }}"> 
     <audio id="audio-player" controls class="hidden"></audio>
     <script id="story-data" type="application/json">{{ story|tojson|safe }}</script>
     <script>
@@ -44,9 +48,10 @@
     </script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="{{ url_for('static', filename='storybook.js') }}"></script>
-
-    <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
+    {% block scripts %}
+    <script src="{{ url_for('static', filename='js/storybook.js') }}"></script>
+    {% endblock %}
+    <script src="{{ url_for('static', filename='js/driver.min.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/tour.js') }}"></script>
 </body>
 </html>

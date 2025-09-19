@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTaskStatus('task2', 'pending');
         updateTaskStatus('task3', 'pending');
         updateTaskStatus('task4', 'pending');
-
+    
         if (progress >= 10) {
             updateTaskStatus('task1', 'completed');
             updateTaskStatus('task2', 'in-progress');
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTaskStatus('task4', 'completed');
         }
     }
-
+    
     function displayResults(data) {
         if (!data || !data.story_uuid) {
             console.error("Invalid data passed to displayResults", data);
@@ -114,21 +114,21 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = `/view_story/${storyId}`;
         };
     }
-
+    
     // --- Production Mode (Polling) Functions ---
-
+    
     function startPolling(taskUUID) {
         toggleForm(true);
         loading.classList.remove('hidden');
         result.classList.add('hidden');
         gamePrompt.classList.remove('hidden');
-
+    
         const pollInterval = setInterval(async () => {
             try {
                 const statusResponse = await fetch(`/generation-status/${taskUUID}`);
                 if (!statusResponse.ok) throw new Error(`Server error: ${statusResponse.status}`);
                 const statusData = await statusResponse.json();
-
+    
                 if (!statusData.success) {
                     if (statusData.error === 'Task not found') {
                         alert('The story task could not be found.');
@@ -140,19 +140,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     throw new Error(statusData.error || 'Failed to get task status.');
                 }
-
+    
                 updateProgress(statusData.task_message, statusData.progress, 100);
-
+    
                 if (statusData.progress < 10) updateTaskStatus('task1', 'in-progress');
                 else if (statusData.progress >= 10 && statusData.progress < 20) { updateTaskStatus('task1', 'completed'); updateTaskStatus('task2', 'in-progress'); }
                 else if (statusData.progress >= 20 && statusData.progress < 95) { updateTaskStatus('task2', 'completed'); updateTaskStatus('task3', 'in-progress'); }
                 else if (statusData.progress >= 95) updateTaskStatus('task3', 'completed');
-
+    
                 if (statusData.status === 'completed' || statusData.status === 'failed') {
                     clearInterval(pollInterval);
                     localStorage.removeItem('activeTaskUUID');
                     toggleForm(false);
-
+    
                     if (statusData.status === 'completed') {
                         updateTaskStatus('task1', 'completed');
                         updateTaskStatus('task2', 'completed');
@@ -171,9 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentTask.textContent = 'Connection issue. Retrying...';
             }
         }, 3000);
-    }
-
-    // --- Local/Heroku (Streaming) Functions ---
+    }    // --- Local/Heroku (Streaming) Functions ---
     function startStreaming(taskDetails) {
         const params = new URLSearchParams(taskDetails);
         currentEventSource = new EventSource(`/generate_story_stream?${params.toString()}`);
@@ -248,8 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const imageMode = formData.get('imageMode');
         const isPublic = formData.get('public') === 'on';
-        const minParagraphs = formData.get('minParagraphs');
-        const maxParagraphs = formData.get('maxParagraphs');
+        const minParagraphs = document.getElementById('minParagraphs').value;
+        const maxParagraphs = document.getElementById('maxParagraphs').value;
 
         if (isProduction) {
             // --- PRODUCTION LOGIC ---

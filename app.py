@@ -411,7 +411,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         genai.configure(api_key=api_key)
         print("Initialized Gemini model with new API key")
         
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         print("Sending story creation request...")
         
         english_story_response = None
@@ -533,7 +533,7 @@ async def generate_style_guide(story_data):
     try:
         api_key = await api_key_manager.get_next_key()
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         style_guide_response = None
         for i in range(len(api_key_manager.keys)):
@@ -588,7 +588,7 @@ async def generate_style_guide(story_data):
 async def analyze_story_characters(story_data):
     """Analyze and create consistent descriptions for all characters in the story"""
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         for i in range(len(api_key_manager.keys)): # Retry for each key
             try:
@@ -683,7 +683,7 @@ async def generate_all_image_prompts(story_data):
         genai.configure(api_key=api_key)
         print("Using new API key for generate_all_image_prompts")
         
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         char_db = story_data.get('character_database', {})
         style_data = story_data.get('style_guide')
@@ -1304,8 +1304,12 @@ def generate_story_stream():
 
         image_mode = request.args.get('imageMode', 'generate')
         public = request.args.get('public') == 'true'
-        min_paragraphs = int(request.args.get('minParagraphs', 15))
-        max_paragraphs = int(request.args.get('maxParagraphs', 20))
+        
+        min_param = request.args.get('minParagraphs')
+        max_param = request.args.get('maxParagraphs')
+        min_paragraphs = int(min_param) if min_param and min_param.isdigit() else 15
+        max_paragraphs = int(max_param) if max_param and max_param.isdigit() else 20
+
         email = session.get('email')
         story_uuid = request.args.get('story_uuid')
 
@@ -1329,16 +1333,16 @@ def generate_story_stream():
         print(f"Error in generate_story_stream setup: {e}")
         traceback.print_exc()
         
-        def error_generate():
+        def error_generate(exc):
             error_payload = {
                 "task": "Error", 
                 "progress": 100, 
                 "total": 100, 
-                "data": {"error": f"A server setup error occurred: {str(e)}"}
+                "data": {"error": f"A server setup error occurred: {str(exc)}"}
             }
             yield f"data: {json.dumps(error_payload)}\n\n"
 
-        return Response(error_generate(), mimetype='text/event-stream')
+        return Response(error_generate(e), mimetype='text/event-stream')
 
 
 from xhtml2pdf import pisa

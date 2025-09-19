@@ -6,23 +6,11 @@
     <title>Browse Public Stories</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Press Start 2P', cursive;
-            background-image: url('/static/images/background.jpg');
-            color: #fff;
-        }
-        .pixel-font {
-            font-family: 'Press Start 2P', cursive;
-        }
-        .story-card {
-            color: #000;
-        }
-    </style>
-    <link rel="stylesheet" href="{{ url_for('static', filename='driver.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='narrator.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/browse.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/driver.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/narrator.css') }}">
 </head>
 <body>
     <div id="custom-driver-overlay"></div>
@@ -49,7 +37,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/driver.min.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/tour.js') }}"></script>
 </body>
 </html>

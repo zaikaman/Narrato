@@ -5,65 +5,11 @@
     <title>Story History</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    <style>
-        body {
-            background-image: url('/static/images/background.jpg');
-        }
-        .story-list {
-            width: 80%;
-            margin: 0 auto;
-            background-color: rgba(0,0,0,0.7);
-            border: 4px solid #fff;
-            box-shadow: 0 0 0 4px #000;
-            padding: 2rem;
-        }
-        .story-item {
-            margin-bottom: 1rem;
-            border-bottom: 2px solid #fff;
-            padding-bottom: 1rem;
-        }
-        .story-item h3 {
-            font-size: 1.5rem;
-            text-shadow: 2px 2px #000;
-        }
-        .story-item p {
-            font-size: 0.8rem;
-            max-height: 100px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .swal-font {
-            font-family: 'Press Start 2P', cursive;
-        }
-
-        @media (max-width: 768px) {
-            .story-list {
-                width: 90%;
-                padding: 1.5rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .story-list {
-                width: 95%;
-                padding: 1rem;
-            }
-
-            .story-item h3 {
-                font-size: 1.2rem;
-            }
-
-            .pixel-button {
-                font-size: 0.7rem;
-            }
-        }
-    </style>
-    <link rel="stylesheet" href="{{ url_for('static', filename='driver.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='narrator.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}">
 </head>
-<body>
+<body data-delete-url="{{ url_for('delete_story') }}" data-flashed-messages="{{ get_flashed_messages(with_categories=true) | tojson | safe }}">
     <div id="custom-driver-overlay"></div>
     <div class="header">
         <a href="{{ url_for('index') }}" class="back-button">← Home</a>
@@ -76,108 +22,56 @@
                     <div class="story-item" id="story-{{ story.id }}">
                         <h3>{{ story.value.title }}</h3>
                         <p>{{ story.value.paragraphs[0] }}...</p>
-                                                <div style="display: flex; align-items: center; gap: 10px; margin-top: 1rem;">
-                            <a href="{{ url_for('get_story', title=story.value.title) }}" class="pixel-button" style="background-color: #3a7bd5; padding: 5px 10px; font-size: 0.8rem;">Read Story</a>
-                            <button class="pixel-button" style="background-color: #d9534f; padding: 5px 10px; font-size: 0.8rem; font-family: 'Press Start 2P', cursive;" onclick="confirmDelete('{{ story.id }}')">Delete</button>
+                        
+                        <div class="story-item-actions">
+                            <a href="{{ url_for('get_story', title=story.value.title) }}" class="pixel-button read-story-button">Read Story</a>
+                            <button class="pixel-button delete-story-button" onclick="handleDeleteClick('{{ story.id }}')">Delete</button>
                         </div>
                     </div>
                 {% endfor %}
             {% else %}
                 <p>You haven't created any stories yet.</p>
             {% endif %}
-            
         </div>
     </div>
 
+    <!-- External Scripts -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
+    <script src="{{ url_for('static', filename='js/history.js') }}"></script>
+    
+    <!-- Application Script -->
     <script>
-        function confirmDelete(storyId) {
-            Swal.fire({
-                title: 'Are you sure?',
-                text: "You won't be able to revert this!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, delete it!',
-                background: '#222',
-                color: '#fff',
-                customClass: {
-                    confirmButton: 'swal-font',
-                    cancelButton: 'swal-font',
-                    title: 'swal-font',
-                    htmlContainer: 'swal-font'
-                }
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    fetch('{{ url_for("delete_story") }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ story_id: storyId })
-                    }).then(response => response.json()).then(data => {
-                        if (data.success) {
-                            const storyElement = document.getElementById(`story-${storyId}`);
-                            if (storyElement) {
-                                storyElement.remove();
-                            }
-                            Toastify({
-                                text: "Story deleted successfully!",
-                                duration: 3000,
-                                close: true,
-                                gravity: "top",
-                                position: "right",
-                                style: {
-                                    background: "linear-gradient(to right, #00b09b, #96c93d)",
-                                    fontFamily: "'Press Start 2P', cursive"
-                                }
-                            }).showToast();
-                        } else {
-                            console.error('Failed to delete story.');
-                            Toastify({
-                                text: "Failed to delete story: " + data.error,
-                                duration: 3000,
-                                close: true,
-                                gravity: "top",
-                                position: "right",
-                                style: {
-                                    background: "linear-gradient(to right, #ff5f6d, #ffc371)",
-                                    fontFamily: "'Press Start 2P', cursive"
-                                }
-                            }).showToast();
-                        }
-                    });
-                }
-            });
+        // Get configuration from data attributes
+        const bodyElement = document.body;
+        const deleteUrl = bodyElement.getAttribute('data-delete-url');
+        const flashedMessagesStr = bodyElement.getAttribute('data-flashed-messages');
+        
+        let flashedMessages = [];
+        try {
+            flashedMessages = flashedMessagesStr ? JSON.parse(flashedMessagesStr) : [];
+        } catch (e) {
+            console.error('Error parsing flashed messages:', e);
         }
-
-        (function() {
-            var flashedMessages = JSON.parse('{{ get_flashed_messages(with_categories=true) | tojson | safe }}');
-            if (flashedMessages) {
-                for (var i = 0; i < flashedMessages.length; i++) {
-                    var category = flashedMessages[i][0];
-                    var message = flashedMessages[i][1];
-                    Toastify({
-                        text: message,
-                        duration: 3000,
-                        close: true,
-                        gravity: "top",
-                        position: "right",
-                        style: {
-                            background: category === 'success' ? 'linear-gradient(to right, #00b09b, #96c93d)' : 'linear-gradient(to right, #ff5f6d, #ffc371)',
-                            fontFamily: '"Press Start 2P", cursive'
-                        }
-                    }).showToast();
-                }
+        
+        // Initialize flashed messages display
+        if (typeof showFlashedMessages === 'function') {
+            showFlashedMessages(flashedMessages);
+        }
+        
+        // Delete handler function
+        function handleDeleteClick(storyId) {
+            if (typeof confirmDelete === 'function') {
+                confirmDelete(storyId, deleteUrl);
+            } else {
+                console.error('confirmDelete function not found');
             }
-        })();
+        }
     </script>
-    <script src="{{ url_for('static', filename='main.js') }}"></script>
-
-    <script src="{{ url_for('static', filename='driver.min.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='tour.js') }}"></script>
+    
+    <!-- Additional Scripts -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/driver.min.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/tour.js') }}"></script>
 </body>
 </html>

@@ -1,13 +1,13 @@
-<link rel="stylesheet" href="{{ url_for('static', filename='intro.css') }}">
-<div id="intro-overlay" style="display: none;">
-    <img src="/static/images/narrator.png" alt="Narrator" id="intro-narrator" style="position: absolute; bottom: 0; left: 20px; width: 200px; z-index: 10000;">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/intro.css') }}">
+<div id="intro-overlay">
+    <img src="/static/images/narrator.png" alt="Narrator" id="intro-narrator">
     <div id="intro-content">
         <h1>Welcome to Narrato!</h1>
         <p>We create stories here. Let me show you around.</p>
         <button id="start-tour-btn">Start Tour</button>
     </div>
 </div>
-<div class="flex justify-between items-center mb-8" style="margin-top: 32px; padding: 0 16px;">
+<div class="flex justify-between items-center mb-8 header-container">
     <div class="flex items-center">
         <a href="{{ url_for('index') }}" class="flex items-center">
             <img src="/static/images/logo.png" alt="Logo" class="h-16">
@@ -31,5 +31,13 @@
         {% endif %}
     </div>
 </div>
-<script src="{{ url_for('static', filename='tour.js') }}"></script>
-<script src="{{ url_for('static', filename='intro.js') }}"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/driver.min.css') }}">
+    <script src="{{ url_for('static', filename='js/driver.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tour.js') }}"></script>
+    <title>Narrato - AI Story Generator</title>
+    <script src="{{ url_for('static', filename='js/intro.js') }}"></script>

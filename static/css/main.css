@@ -420,3 +420,24 @@ body {
     opacity: 0.75;
     z-index: 10000;
 }
+#intro-overlay {
+    display: none;
+}
+
+#intro-narrator {
+    position: absolute;
+    bottom: 0;
+    left: 20px;
+    width: 200px;
+    z-index: 10000;
+}
+
+.header-container {
+    margin-top: 32px;
+    padding: 0 16px;
+}
+
+#manual-final-tip {
+    display: none;
+    z-index: 999999;
+}
