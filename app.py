@@ -1213,7 +1213,13 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
             if step == 0:
                 # 1. Generate story content
                 yield progress_update('Creating story content...', 0, 100)
-                story_data = await generate_story_content(prompt, min_paragraphs, max_paragraphs)
+                ping_task = asyncio.create_task(generate_story_content(prompt, min_paragraphs, max_paragraphs))
+                while not ping_task.done():
+                    try:
+                        await asyncio.wait_for(asyncio.shield(ping_task), timeout=15)
+                    except asyncio.TimeoutError:
+                        yield progress_update('Creating story content... (ping)', 0, 100)
+                story_data = await ping_task
                 save_progress(1, {'story_data': story_data})
                 yield progress_update('Story content generated', 10, 100, story_data)
                 step = 1
@@ -1222,7 +1228,14 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
                 yield progress_update('Analyzing story elements...', 15, 100)
                 style_task = generate_style_guide(story_data)
                 chars_task = analyze_story_characters(story_data)
-                style_data, char_data = await asyncio.gather(style_task, chars_task)
+                
+                gather_task = asyncio.create_task(asyncio.gather(style_task, chars_task))
+                while not gather_task.done():
+                    try:
+                        await asyncio.wait_for(asyncio.shield(gather_task), timeout=15)
+                    except asyncio.TimeoutError:
+                        yield progress_update('Analyzing story elements... (ping)', 15, 100)
+                style_data, char_data = await gather_task
                 story_data['style_guide'] = style_data
                 story_data['character_database'] = char_data if char_data else {"main_characters": [], "supporting_characters": [], "groups": []}
                 save_progress(2, {'story_data': story_data})
@@ -1231,7 +1244,13 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
             elif step == 2:
                 # 4. Generate image prompts
                 yield progress_update('Generating image prompts...', 30, 100)
-                image_prompts = await generate_all_image_prompts(story_data)
+                prompts_task = asyncio.create_task(generate_all_image_prompts(story_data))
+                while not prompts_task.done():
+                    try:
+                        await asyncio.wait_for(asyncio.shield(prompts_task), timeout=15)
+                    except asyncio.TimeoutError:
+                        yield progress_update('Generating image prompts... (ping)', 30, 100)
+                image_prompts = await prompts_task
                 save_progress(3, {'story_data': story_data, 'image_prompts': image_prompts})
                 yield progress_update(f'Generated {len(image_prompts)} prompts', 35, 100)
                 step = 3
@@ -1243,12 +1262,19 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
                     num_prompts = len(image_prompts)
                     start_index = len(image_data)
                     for i, p in enumerate(image_prompts[start_index:], start=start_index):
-                        image_url = await generate_image(p)
+                        progress = 40 + int(30 * (i + 1) / num_prompts)
+                        image_task = asyncio.create_task(generate_image(p))
+                        while not image_task.done():
+                            try:
+                                await asyncio.wait_for(asyncio.shield(image_task), timeout=15)
+                            except asyncio.TimeoutError:
+                                yield progress_update(f'Generating image {i + 1} of {num_prompts}... (ping)', progress, 100)
+                        image_url = await image_task
+                        
                         image_data.append({'url': image_url, 'prompt': p})
                         story_data['images'] = image_data
                         # Save progress within the loop for resumability
                         save_progress(3, {'story_data': story_data, 'image_prompts': image_prompts})
-                        progress = 40 + int(30 * (i + 1) / num_prompts)
                         yield progress_update(f'Generated image {i + 1} of {num_prompts}', progress, 100, story_data)
                 else:
                     story_data['images'] = [{'prompt': p, 'url': None} for p in image_prompts]
@@ -1264,13 +1290,20 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
                 num_texts = len(texts_to_voice)
                 start_index = len(audio_files)
                 for i, text in enumerate(texts_to_voice[start_index:], start=start_index):
-                    audio_url = await generate_voice(text)
+                    progress = 75 + int(20 * (i + 1) / num_texts)
+                    audio_task = asyncio.create_task(generate_voice(text))
+                    while not audio_task.done():
+                        try:
+                            await asyncio.wait_for(asyncio.shield(audio_task), timeout=15)
+                        except asyncio.TimeoutError:
+                            yield progress_update(f'Generated audio {i + 1} of {num_texts}... (ping)', progress, 100)
+                    audio_url = await audio_task
+
                     audio_files.append(audio_url)
                     story_data['audio_files'] = audio_files
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(1) # Keep the rate-limiting sleep
                     # Save progress within the loop for resumability
                     save_progress(4, {'story_data': story_data, 'image_prompts': image_prompts})
-                    progress = 75 + int(20 * (i + 1) / num_texts)
                     yield progress_update(f'Generated audio {i + 1} of {num_texts}', progress, 100, {'audio_file': audio_url, 'index': i})
 
                 save_progress(5, {'story_data': story_data, 'image_prompts': image_prompts})
