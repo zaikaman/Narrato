@@ -99,6 +99,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     ];
 
+    driver.defineSteps(indexPageSteps);
+    window.driver = driver;
+
     // --- Tour Logic ---
     const tourStep = localStorage.getItem('tour_step');
     const urlParams = new URLSearchParams(window.location.search);
@@ -122,11 +125,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
 
-        } else if (!localStorage.getItem('tour_seen')) {
-            driver.defineSteps(indexPageSteps);
-            driver.start();
-            localStorage.setItem('tour_seen', 'true');
-        }
+        } 
     } else if (document.querySelector('.story-card') && tourStep === 'browse') { // On browse page
         driver.defineSteps(browsePageSteps);
         driver.start();
