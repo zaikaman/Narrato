@@ -1384,14 +1384,16 @@ def link_callback(uri, rel):
     Convert HTML URIs to absolute system paths so xhtml2pdf can access those
     resources
     """
-    static_root = os.path.join(os.path.dirname(__file__), 'static')
-    
-    uri_parts = uri.split('/')
-    path_str = os.path.join(static_root, *uri_parts)
+    # The URI from url_for('static', ...) will start with /static/
+    if uri.startswith('/static/'):
+        project_root = os.path.dirname(__file__)
+        # The uri is /static/css/file.css, we need to map it to <project_root>/static/css/file.css
+        path = os.path.join(project_root, uri.lstrip('/'))
+        path = os.path.normpath(path)
 
-    if os.path.exists(path_str):
-        return Path(path_str).as_uri()
-    
+        if os.path.exists(path):
+            return Path(path).as_uri()
+
     if uri.startswith("data:"):
         return uri
 
