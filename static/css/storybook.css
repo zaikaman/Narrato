@@ -265,3 +265,7 @@ body {
     opacity: 0.75;
     z-index: 10000;
 }
+
+.page.no-image p {
+    padding: 0 70px;
+}

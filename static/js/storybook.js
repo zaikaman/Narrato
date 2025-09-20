@@ -59,6 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let content = '';
         if (pageData.image && pageData.image.url) {
             content += `<img src="${pageData.image.url}" alt="Illustration">`;
+        } else {
+            page.classList.add('no-image');
         }
         content += `<p>${pageData.paragraph}</p>`;
         page.innerHTML = content;
