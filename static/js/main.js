@@ -103,6 +103,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    function createEpicTransition() {
+        const modal = document.getElementById('story-ready-modal');
+        const modalContent = modal.querySelector('.modal-content');
+
+        modal.style.display = 'block';
+
+        const particleContainer = document.createElement('div');
+        particleContainer.id = 'particle-container';
+        modalContent.appendChild(particleContainer);
+
+        for (let i = 0; i < 50; i++) {
+            const particle = document.createElement('div');
+            particle.classList.add('particle');
+            const size = Math.random() * 5 + 2;
+            particle.style.width = `${size}px`;
+            particle.style.height = `${size}px`;
+            particle.style.top = `50%`;
+            particle.style.left = `50%`;
+            particle.style.setProperty('--x', `${(Math.random() - 0.5) * 400}px`);
+            particle.style.setProperty('--y', `${(Math.random() - 0.5) * 400}px`);
+            particleContainer.appendChild(particle);
+        }
+
+        setTimeout(() => {
+            modal.style.opacity = 1;
+            modalContent.style.transform = 'translate(-50%, -50%) scale(1)';
+        }, 10);
+
+        setTimeout(() => {
+            particleContainer.remove();
+        }, 1000);
+    }
+
     function displayResults(data) {
         if (!data || !data.story_uuid) {
             console.error("Invalid data passed to displayResults", data);
@@ -110,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const storyId = data.story_uuid;
-        storyReadyModal.style.display = 'block';
+        createEpicTransition();
         viewStoryBtn.onclick = () => {
             window.location.href = `/view_story/${storyId}`;
         };
