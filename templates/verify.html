@@ -5,12 +5,16 @@
     <title>Verify OTP</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/driver.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/narrator.css') }}">
 </head>
 <body>
+    <div class="header">
+        <a href="{{ url_for('index') }}" class="back-button">&larr; Home</a>
+    </div>
     <div id="custom-driver-overlay"></div>
     <div class="story-form-container">
         <h2>Verify OTP</h2>
