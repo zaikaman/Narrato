@@ -7,6 +7,6 @@ requests
 python-multipart
 aiohttp
 cloudinary
-speechify-api
+git+https://github.com/SpeechifyInc/speechify-api-sdk-python
 xhtml2pdf
 gunicorn
