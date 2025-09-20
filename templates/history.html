@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/driver.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/narrator.css') }}">
 </head>
 <body data-delete-url="{{ url_for('delete_story') }}" data-flashed-messages="{{ get_flashed_messages(with_categories=true) | tojson | safe }}">
     <div id="custom-driver-overlay"></div>
