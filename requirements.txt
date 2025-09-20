@@ -10,3 +10,4 @@ cloudinary
 git+https://github.com/SpeechifyInc/speechify-api-sdk-python
 xhtml2pdf
 gunicorn
+gradio_client

@@ -20,6 +20,7 @@ import uuid
 import base64
 import json
 from google.api_core import exceptions
+from gradio_client import Client 
 
 load_dotenv()
 
@@ -201,7 +202,7 @@ def shov_forget(key):
 
 async def generate_with_fallback(prompt, safety_settings=None):
     """Generates content using Gemini with model fallback."""
-    models = ['gemini-2.0-flash-lite', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
     last_exception = None
 
     # Using a single API key for the duration of a fallback sequence.
@@ -277,7 +278,19 @@ api_key_manager = APIKeyManager(google_keys)
 speechify_keys = sorted([v for k, v in os.environ.items() if k.startswith('SPEECHIFY_KEY')])
 speechify_api_key_manager = APIKeyManager(speechify_keys)
 
-
+# Initialize Hugging Face API key manager
+keys_with_indices = []
+for k, v in os.environ.items():
+    if k.startswith('HUGGING_FACE_TOKEN'):
+        if k == 'HUGGING_FACE_TOKEN':
+            keys_with_indices.append((1, v))
+        else:
+            match = re.search(r'_(\d+)$', k)
+            if match:
+                keys_with_indices.append((int(match.group(1)), v))
+keys_with_indices.sort(key=lambda x: x[0])
+huggingface_keys = [v for i, v in keys_with_indices]
+huggingface_api_key_manager = APIKeyManager(huggingface_keys)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
@@ -304,56 +317,79 @@ def login_required(f):
 # Global configuration is removed to allow for dynamic key rotation per request.
 
 async def generate_image(prompt):
-    """Generate image from prompt using Runware API and upload to Cloudinary"""
-    try:
-        print(f"\n=== Starting generate_image with Runware ===")
-        print(f"Input prompt: {prompt}")
+    """Generate image from prompt using Gradio Client with key rotation and retry."""
+    max_cycles = 3  # Try the full list of keys 3 times
 
-        url = "https://api.runware.ai/v1/imageInference"
-        headers = {
-            "Authorization": f"Bearer {os.getenv('RUNWARE_TOKEN')}",
-            "Content-Type": "application/json"
-        }
-        payload = [{
-            "taskType": "imageInference",
-            "taskUUID": str(uuid.uuid4()),
-            "outputType": "URL",
-            "outputFormat": "jpg",
-            "positivePrompt": prompt,
-            "model": "civitai:497255@552771",
-            "height": 1024,
-            "width": 1024,
-            "steps": 30,
-            "CFGScale": 7.5
-        }]
-
-        response = await sync_to_async(requests.post)(url, headers=headers, json=payload)
-        response.raise_for_status()
-        data = response.json()
-
-        if data.get("data") and data["data"][0].get("imageURL"):
-            image_url = data["data"][0]["imageURL"]
-            
-            # Download the image from the URL
-            image_response = await sync_to_async(requests.get)(image_url)
-            image_response.raise_for_status()
-
-            # Upload the image to Cloudinary
-            upload_result = await sync_to_async(cloudinary.uploader.upload)(image_response.content)
-            cloudinary_url = upload_result.get('secure_url')
-
-            print(f"Image uploaded to Cloudinary: {cloudinary_url}")
-            print("=== Finished generate_image with Runware ===\n")
-            return cloudinary_url
-        else:
-            print("No image data found in Runware response")
+    for cycle in range(max_cycles):
+        num_keys = len(huggingface_api_key_manager.keys)
+        if num_keys == 0:
+            print("--- FATAL: No Hugging Face API keys found. Cannot generate image. ---")
             return None
 
-    except Exception as e:
-        print(f"Error creating image with Runware: {str(e)}")
-        print(f"Stack trace: {traceback.format_exc()}")
-        print("=== Finished generate_image with Runware with exception ===\n")
-        return None
+        for i in range(num_keys):
+            current_key = ""
+            try:
+                # Get the next key in round-robin fashion
+                current_key = await huggingface_api_key_manager.get_next_key()
+                print(
+                    f"\n=== Attempting image generation with key ending in ...{current_key[-4:]} "
+                    f"(Attempt {i+1}/{num_keys}, Cycle {cycle+1}/{max_cycles}) ==="
+                )
+                print(f"Input prompt: {prompt}")
+
+                def predict_sync():
+                    # Pass the specific key for this attempt
+                    client = Client("stabilityai/stable-diffusion-3.5-large-turbo", hf_token=current_key)
+                    result = client.predict(
+                        prompt=prompt,
+                        negative_prompt="",
+                        seed=0,
+                        randomize_seed=True,
+                        width=1024,
+                        height=1024,
+                        guidance_scale=0,
+                        num_inference_steps=4,
+                        api_name="/infer"
+                    )
+
+                    # The result is expected to be a tuple/list where the first element is a file path
+                    if result and isinstance(result, (list, tuple)) and isinstance(result[0], str):
+                        return result[0]  # The path is the first element
+
+                    print(f"--- UNEXPECTED GRADIO CLIENT RAW RESULT ---: {result}")
+                    raise Exception("Invalid or unexpected response format from Gradio client")
+
+                # Run the blocking predict_sync in a thread and await result
+                local_image_path = await sync_to_async(predict_sync)()
+
+                if local_image_path:
+                    # Success! Upload to Cloudinary and return.
+                    upload_result = await sync_to_async(cloudinary.uploader.upload)(local_image_path)
+                    cloudinary_url = upload_result.get("secure_url")
+                    print(f"Image uploaded to Cloudinary: {cloudinary_url}")
+
+                    try:
+                        os.remove(local_image_path)
+                    except OSError as e:
+                        print(f"Error removing temporary file {local_image_path}: {e}")
+
+                    return cloudinary_url
+
+            except Exception as e:
+                key_identifier = f"...{current_key[-4:]}" if current_key else "N/A"
+                print(f"--- Key {key_identifier} failed. Error: {e} ---")
+                if i == num_keys - 1:
+                    print(f"--- All {num_keys} keys failed in cycle {cycle+1}. ---")
+                continue  # Move to the next key
+
+        # If we've completed a full cycle of failures, wait before retrying
+        if cycle < max_cycles - 1:
+            print("--- Waiting for 60 seconds before retrying all keys... ---")
+            await asyncio.sleep(60)
+
+    # If all cycles fail
+    print("--- All retry cycles failed. Could not generate image. ---")
+    return None
 
 def find_character(name, char_db):
     """Find character information in the database
@@ -914,15 +950,11 @@ def shov_update(collection_name, item_id, value):
         "Content-Type": "application/json"
     }
     data = {"collection": collection_name, "value": value}
-    print(f"--- Shov Update --- PRE-REQUEST: Updating {item_id} in {collection_name} with {data}")
     try:
         response = requests.post(f"{SHOV_API_URL}/update/{PROJECT_NAME}/{item_id}", headers=headers, json=data)
-        print(f"--- Shov Update --- POST-REQUEST: Status Code: {response.status_code}")
         response_json = response.json()
-        print(f"--- Shov Update --- POST-REQUEST: JSON Response: {response_json}")
         return response_json
     except requests.exceptions.RequestException as e:
-        print(f"--- Shov Update --- FATAL: RequestException: {e}")
         return {"success": False, "error": "RequestException", "details": str(e)}
     except json.JSONDecodeError:
         return {"success": False, "error": "JSONDecodeError", "details": "API returned success status but response was not valid JSON."}

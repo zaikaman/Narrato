@@ -20,7 +20,7 @@
 ## ✨ Features
 
 -   **✍️ AI Story Generation:** Leverages Google's Gemini to write engaging and creative stories.
--   **🎨 AI-Powered Illustrations:** Generates beautiful, consistent images for each paragraph using Runware and a smart character analysis pipeline.
+-   **🎨 AI-Powered Illustrations:** Generates beautiful, consistent images for each paragraph using a Hugging Face Space (`stabilityai/stable-diffusion-3.5-large-turbo`) and a smart character analysis pipeline.
 -   **🎤 AI-Powered Narration:** Converts the story text into high-quality audio narration with the Speechify API.
 -   **🤖 Intelligent Consistency Pipeline:** A unique, multi-step AI process analyzes the story to create a "character database" and "style guide," ensuring visual consistency across all illustrations.
 -   **🔐 User Authentication:** Secure, password-less login system using OTPs sent via email, powered by Shov.com.
@@ -37,7 +37,7 @@ Narrato's magic lies in its state-of-the-art AI pipeline that ensures a high-qua
     *   **Character Database:** Detailed descriptions of every character's appearance, clothing, and expressions.
     *   **Art Style Guide:** A consistent guide for color palette, lighting, and overall artistic style.
 3.  **Analysis -> Image Prompts:** With the story, character database, and style guide, **Gemini** crafts highly detailed, consistent prompts for the image generation AI for *every single paragraph*.
-4.  **Prompts -> Images:** The prompts are sent to the **Runware API** to generate illustrations. The results are stored in **Cloudinary**.
+4.  **Prompts -> Images:** The prompts are sent to the **Hugging Face API** (via `gradio_client`) to generate illustrations using the `stabilityai/stable-diffusion-3.5-large-turbo` model. The results are stored in **Cloudinary**.
 5.  **Text -> Audio:** The story's title and paragraphs are sent to the **Speechify API** to generate audio narration, which is also stored in **Cloudinary**.
 6.  **Assembly:** The final story—with text, images, and audio—is assembled and saved to the user's history using **Shov.com**.
 
@@ -96,8 +96,10 @@ You'll need to provide API keys for the various services used in the project.
     # Speechify API Keys (add as many as you have)
     SPEECHIFY_KEY_1="your_speechify_api_key_1"
 
-    # Runware API for Image Generation
-    RUNWARE_TOKEN="your_runware_api_token"
+    # Hugging Face for Image Generation (add as many as you have)
+    # The app will automatically use HUGGING_FACE_TOKEN, HUGGING_FACE_TOKEN_2, HUGGING_FACE_TOKEN_3, etc.
+    HUGGING_FACE_TOKEN="your_hugging_face_token_1"
+    HUGGING_FACE_TOKEN_2="your_hugging_face_token_2"
 
     # Cloudinary for Media Storage
     CLOUDINARY_CLOUD_NAME="your_cloudinary_cloud_name"
