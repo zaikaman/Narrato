@@ -1467,9 +1467,6 @@ def export_pdf(story_uuid):
 
     return "Story not found", 404
 
-
-
-
 # --- Shov.com Test Endpoints ---
 
 @app.route('/shov-test')
@@ -1538,4 +1535,3 @@ def api_shov_remove():
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
-

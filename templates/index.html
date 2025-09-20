@@ -51,14 +51,14 @@
                         <label class="block text-sm font-medium text-gray-700">Image generation mode</label>
                         <div class="space-y-2">
                             <div class="flex items-center">
-                                <input type="radio" id="generateImages" name="imageMode" value="generate" checked
+                                <input type="checkbox" id="generateImages" name="imageMode" value="generate" checked
                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
                                 <label for="generateImages" class="ml-2 block text-sm text-gray-700">
                                     Generate images directly
                                 </label>
                             </div>
                             <div class="flex items-center">
-                                <input type="radio" id="promptOnly" name="imageMode" value="prompt"
+                                <input type="checkbox" id="promptOnly" name="imageMode" value="prompt"
                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
                                 <label for="promptOnly" class="ml-2 block text-sm text-gray-700">
                                     Only generate text (no images)
@@ -69,7 +69,7 @@
 
                     <div class="space-y-2">
                         <div class="flex items-center">
-                            <input type="checkbox" id="public" name="public" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                            <input type="checkbox" id="public" name="public" checked class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
                             <label for="public" class="ml-2 block text-sm text-gray-700">Make story public</label>
                         </div>
                     </div>
@@ -177,6 +177,18 @@
     <script src="{{ url_for('static', filename='js/game.js') }}"></script>
 
     <script src="{{ url_for('static', filename='js/driver.min.js') }}"></script>
+
+    <script>
+        // Make image-mode checkboxes behave like radios (mutually exclusive)
+        (function(){
+            var gen = document.getElementById('generateImages');
+            var promptOnly = document.getElementById('promptOnly');
+            if(gen && promptOnly){
+                gen.addEventListener('change', function(){ if(this.checked) promptOnly.checked = false; });
+                promptOnly.addEventListener('change', function(){ if(this.checked) gen.checked = false; });
+            }
+        })();
+    </script>
 
     <div id="manual-final-tip" class="driver-popover-item">
         <h3 class="driver-popover-title">One Last Tip!</h3>
