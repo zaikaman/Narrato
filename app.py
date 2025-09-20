@@ -199,6 +199,47 @@ def shov_forget(key):
         print(f"--- Shov Forget --- FATAL: {e}")
         return {"success": False, "error": str(e)}
 
+async def generate_with_fallback(prompt, safety_settings=None):
+    """Generates content using Gemini with model fallback."""
+    models = ['gemini-2.0-flash-lite', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    last_exception = None
+
+    # Using a single API key for the duration of a fallback sequence.
+    # Key rotation is handled by the APIKeyManager on subsequent calls to this function.
+    try:
+        api_key = await api_key_manager.get_least_used_key()
+        genai.configure(api_key=api_key)
+        print(f"Initialized Gemini for fallback generation.")
+    except Exception as e:
+        print(f"Failed to configure Gemini API key: {e}")
+        raise
+
+    for model_name in models:
+        try:
+            print(f"Attempting generation with model: {model_name}")
+            model = genai.GenerativeModel(model_name)
+            
+            if safety_settings:
+                response = model.generate_content(prompt, safety_settings=safety_settings)
+            else:
+                response = model.generate_content(prompt)
+            
+            print(f"Successfully generated content with model: {model_name}")
+            return response
+        except exceptions.ResourceExhausted as e:
+            last_exception = e
+            print(f"Model {model_name} exhausted. Switching to next model. Error: {e}")
+            continue
+        except Exception as e:
+            print(f"An unexpected error occurred with model {model_name}: {e}")
+            last_exception = e
+            break
+
+    if last_exception:
+        raise last_exception
+    raise Exception("Failed to generate content with all available models.")
+
+
 class APIKeyManager:
     """Manages and rotates API keys"""
     def __init__(self, keys):
@@ -406,18 +447,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         print(f"\n=== Starting generate_story_content ===")
         print(f"Input prompt: {prompt}")
         
-        # Get the least used API key
-        api_key = await api_key_manager.get_least_used_key()
-        genai.configure(api_key=api_key)
-        print("Initialized Gemini model with new API key")
-        
-        model = genai.GenerativeModel('gemini-2.0-flash-lite')
-        print("Sending story creation request...")
-        
-        english_story_response = None
-        for i in range(len(api_key_manager.keys)): # Retry for each key
-            try:
-                english_story_response = model.generate_content(f'''
+        prompt_content = f'''
         You are a master storyteller writing an engaging and detailed story for a general audience. 
         Create a rich, vivid story based on this theme: {prompt}
 
@@ -460,16 +490,8 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         - Return ONLY the JSON object, no other text
         - Number of paragraphs should be between {min_paragraphs} and {max_paragraphs}
         - The story should feel complete, don't force it to exactly {max_paragraphs} paragraphs
-        ''')
-                break # Success
-            except exceptions.ResourceExhausted as e:
-                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
-                api_key = await api_key_manager.get_next_key()
-                genai.configure(api_key=api_key)
-                print("Switched to new API key.")
-        
-        if not english_story_response:
-            raise Exception("Failed to generate story content after multiple retries.")
+        '''
+        english_story_response = await generate_with_fallback(prompt_content)
 
         print("Received response from Gemini")
         
@@ -534,14 +556,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
 async def generate_style_guide(story_data):
     """Generate a consistent art style guide for the story."""
     try:
-        api_key = await api_key_manager.get_next_key()
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash-lite')
-        
-        style_guide_response = None
-        for i in range(len(api_key_manager.keys)):
-            try:
-                style_guide_response = model.generate_content(f'''
+        prompt_content = f'''
         Create a consistent art style guide for this story. Read the title and first few paragraphs:
         Title: {story_data['title']}
         Story start: {' '.join(story_data['paragraphs'][:5])}
@@ -557,13 +572,8 @@ async def generate_style_guide(story_data):
                 "perspective": "How scenes should be framed"
             }}
         }}
-        ''' )
-                break
-            except exceptions.ResourceExhausted as e:
-                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
-                api_key = await api_key_manager.get_next_key()
-                genai.configure(api_key=api_key)
-                print("Switched to new API key.")
+        '''
+        style_guide_response = await generate_with_fallback(prompt_content)
 
         if not style_guide_response:
             raise Exception("Failed to generate style guide after multiple retries.") 
@@ -591,11 +601,7 @@ async def generate_style_guide(story_data):
 async def analyze_story_characters(story_data):
     """Analyze and create consistent descriptions for all characters in the story"""
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-lite')
-        
-        for i in range(len(api_key_manager.keys)): # Retry for each key
-            try:
-                character_analysis = model.generate_content(f'''
+        prompt_content = f'''
         You are a character designer creating consistent descriptions for all characters in this story. 
         Analyze the entire story carefully and create detailed, consistent descriptions that will be used for ALL images.
         
@@ -646,14 +652,9 @@ async def analyze_story_characters(story_data):
                 }}
             ]
         }}
-        ''')
-                break # Success
-            except exceptions.ResourceExhausted as e:
-                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
-                api_key = await api_key_manager.get_next_key()
-                genai.configure(api_key=api_key)
-                print("Switched to new API key.")
-        
+        '''
+        character_analysis = await generate_with_fallback(prompt_content)
+
         if not character_analysis:
             print("Failed to generate character analysis after multiple retries.")
             return None
@@ -682,12 +683,6 @@ async def analyze_story_characters(story_data):
 async def generate_all_image_prompts(story_data):
     """Create all image prompts for the story using Gemini, ensuring consistency."""
     try:
-        api_key = await api_key_manager.get_next_key()
-        genai.configure(api_key=api_key)
-        print("Using new API key for generate_all_image_prompts")
-        
-        model = genai.GenerativeModel('gemini-2.0-flash-lite')
-        
         char_db = story_data.get('character_database', {})
         style_data = story_data.get('style_guide')
         style_context = ""
@@ -750,16 +745,7 @@ Return ONLY a JSON object in this format, with a list of prompts matching the nu
             genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
         }
 
-        image_prompts_response = None
-        for i in range(len(api_key_manager.keys)): # Retry for each key
-            try:
-                image_prompts_response = model.generate_content(prompt_for_gemini, safety_settings=safety_settings)
-                break # Success
-            except exceptions.ResourceExhausted as e:
-                print(f"Attempt {i+1} failed with ResourceExhausted error: {e}. Switching to next API key.")
-                api_key = await api_key_manager.get_next_key()
-                genai.configure(api_key=api_key)
-                print("Switched to new API key.")
+        image_prompts_response = await generate_with_fallback(prompt_for_gemini, safety_settings=safety_settings)
         
         if not image_prompts_response:
             print("Failed to generate image prompts after multiple retries.")
