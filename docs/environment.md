@@ -29,9 +29,6 @@ HUGGING_FACE_TOKEN="YOUR_HUGGING_FACE_TOKEN_1"
 HUGGING_FACE_TOKEN_2="YOUR_HUGGING_FACE_TOKEN_2"
 # ... and so on
 
-# Secret key for signing worker requests
-WORKER_SECRET="A_STRONG_RANDOM_SECRET_KEY"
-
 # Flask Secret Key (for session management)
 SECRET_KEY="A_DIFFERENT_STRONG_RANDOM_SECRET_KEY"
 ```
@@ -39,5 +36,4 @@ SECRET_KEY="A_DIFFERENT_STRONG_RANDOM_SECRET_KEY"
 ### Notes:
 
 - **Multiple API Keys**: For services like Google Gemini and Hugging Face, you can provide multiple keys (`GOOGLE_API_KEY_2`, `HUGGING_FACE_TOKEN_2`, etc.). The application is designed to rotate through these keys, which can help manage rate limits.
-- **`WORKER_SECRET`**: This is a secret key you create. It is used to authenticate requests to the background worker endpoint (`/api/run-worker`).
 - **`SECRET_KEY`**: This is a standard Flask secret key used for signing session cookies. Make sure it is a long, random, and secret string.

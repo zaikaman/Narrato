@@ -29,9 +29,6 @@ def create_app(config_class=DevelopmentConfig):
     from .routes.story import story_bp
     app.register_blueprint(story_bp)
 
-    from .routes.api import api_bp
-    app.register_blueprint(api_bp)
-
     from .routes.stream import stream_bp
     app.register_blueprint(stream_bp)
 

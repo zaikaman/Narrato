@@ -42,22 +42,10 @@ This document provides a reference for the API endpoints available in the Auto-A
   - **Methods**: `GET`
   - **Description**: Exports a story as a PDF file.
 
-## Worker API (`api_routes.py`)
+## Story Generation API (`stream_routes.py`)
 
-- **`/start-story-generation`**
-  - **Methods**: `POST`
-  - **Description**: Starts an asynchronous story generation task.
-
-- **`/generation-status/<task_uuid>`**
-  - **Methods**: `GET`
-  - **Description**: Polls for the status of a story generation task.
-
-- **`/api/run-worker`**
-  - **Methods**: `POST`
-  - **Description**: An internal endpoint for a background worker to process generation tasks. Requires a `WORKER_SECRET` for authorization.
-
-## Streaming API (`stream_routes.py`)
+This is the primary API for creating stories.
 
 - **`/generate_story_stream`**
   - **Methods**: `GET`
-  - **Description**: Starts a story generation process and streams the progress back to the client using Server-Sent Events (SSE).
+  - **Description**: Starts a story generation process based on URL parameters (`prompt`, `imageMode`, etc.). The server holds the connection open and streams progress updates back to the client using Server-Sent Events (SSE).

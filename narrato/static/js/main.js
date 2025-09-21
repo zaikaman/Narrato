@@ -149,63 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
     
-    // --- Production Mode (Polling) Functions ---
-    
-    function startPolling(taskUUID) {
-        toggleForm(true);
-        loading.classList.remove('hidden');
-        result.classList.add('hidden');
-        gamePrompt.classList.remove('hidden');
-    
-        const pollInterval = setInterval(async () => {
-            try {
-                const statusResponse = await fetch(`/generation-status/${taskUUID}`);
-                if (!statusResponse.ok) throw new Error(`Server error: ${statusResponse.status}`);
-                const statusData = await statusResponse.json();
-    
-                if (!statusData.success) {
-                    if (statusData.error === 'Task not found') {
-                        alert('The story task could not be found.');
-                        localStorage.removeItem('activeTaskUUID');
-                        clearInterval(pollInterval);
-                        toggleForm(false);
-                        window.location.reload();
-                        return;
-                    }
-                    throw new Error(statusData.error || 'Failed to get task status.');
-                }
-    
-                updateProgress(statusData.task_message, statusData.progress, 100);
-    
-                if (statusData.progress < 10) updateTaskStatus('task1', 'in-progress');
-                else if (statusData.progress >= 10 && statusData.progress < 20) { updateTaskStatus('task1', 'completed'); updateTaskStatus('task2', 'in-progress'); }
-                else if (statusData.progress >= 20 && statusData.progress < 95) { updateTaskStatus('task2', 'completed'); updateTaskStatus('task3', 'in-progress'); }
-                else if (statusData.progress >= 95) updateTaskStatus('task3', 'completed');
-    
-                if (statusData.status === 'completed' || statusData.status === 'failed') {
-                    clearInterval(pollInterval);
-                    localStorage.removeItem('activeTaskUUID');
-                    toggleForm(false);
-    
-                    if (statusData.status === 'completed') {
-                        updateTaskStatus('task1', 'completed');
-                        updateTaskStatus('task2', 'completed');
-                        updateTaskStatus('task3', 'completed');
-                        displayResults(statusData.result);
-                        loading.classList.add('hidden');
-                        if (window.stopGame) stopGame();
-                        gameContainer.classList.add('hidden');
-                    } else {
-                        alert(`Story generation failed: ${statusData.error || 'Unknown error'}`);
-                        window.location.reload();
-                    }
-                }
-            } catch (pollError) {
-                console.error("Polling network error (will retry):", pollError.message);
-                currentTask.textContent = 'Connection issue. Retrying...';
-            }
-        }, 3000);
-    }    // --- Local/Heroku (Streaming) Functions ---
+    // --- Local/Heroku (Streaming) Functions ---
     function startStreaming(taskDetails) {
         const params = new URLSearchParams(taskDetails);
         currentEventSource = new EventSource(`/generate_story_stream?${params.toString()}`);
@@ -292,60 +236,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const minParagraphs = document.getElementById('minParagraphs').value;
         const maxParagraphs = document.getElementById('maxParagraphs').value;
 
-        if (isProduction) {
-            // --- PRODUCTION LOGIC ---
-            try {
-                const startResponse = await fetch('/start-story-generation', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, imageMode, public: isPublic, minParagraphs, maxParagraphs }),
-                });
-                const startData = await startResponse.json();
-                if (!startData.success) throw new Error(startData.error || 'Failed to start story generation.');
-                localStorage.setItem('activeTaskUUID', startData.task_uuid);
-                startPolling(startData.task_uuid);
-            } catch (startError) {
-                console.error("Starting generation failed:", startError);
-                alert(startError.message);
-                sessionStorage.removeItem('isSubmitting'); // Reset submission guard
-                toggleForm(false);
-                window.location.reload();
-            }
-        } else {
-            // --- LOCAL DEVELOPMENT LOGIC ---
-            const taskDetails = {
-                story_uuid: crypto.randomUUID(),
-                prompt,
-                imageMode,
-                public: isPublic,
-                minParagraphs,
-                maxParagraphs
-            };
-            localStorage.setItem(activeStreamTaskKey, JSON.stringify(taskDetails));
-            startStreaming(taskDetails);
-        }
+        const taskDetails = {
+            story_uuid: crypto.randomUUID(),
+            prompt,
+            imageMode,
+            public: isPublic,
+            minParagraphs,
+            maxParagraphs
+        };
+        localStorage.setItem(activeStreamTaskKey, JSON.stringify(taskDetails));
+        startStreaming(taskDetails);
     });
 
     // --- Initial Page Load Logic ---
-    if (isProduction) {
-        const activeTaskUUID = localStorage.getItem('activeTaskUUID');
-        if (activeTaskUUID) {
-            console.log('Resuming task:', activeTaskUUID);
-            startPolling(activeTaskUUID);
-        }
-    } else {
-        const taskJSON = localStorage.getItem(activeStreamTaskKey);
-        if (taskJSON) {
-            const taskDetails = JSON.parse(taskJSON);
-            console.log('Resuming stream task:', taskDetails.story_uuid);
-            
-            toggleForm(true);
-            loading.classList.remove('hidden');
-            result.classList.add('hidden');
-            gamePrompt.classList.remove('hidden');
+    const taskJSON = localStorage.getItem(activeStreamTaskKey);
+    if (taskJSON) {
+        const taskDetails = JSON.parse(taskJSON);
+        console.log('Resuming stream task:', taskDetails.story_uuid);
+        
+        toggleForm(true);
+        loading.classList.remove('hidden');
+        result.classList.add('hidden');
+        gamePrompt.classList.remove('hidden');
 
-            startStreaming(taskDetails);
-        }
+        startStreaming(taskDetails);
     }
 
     // --- UI & Utility Listeners ---
