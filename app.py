@@ -320,6 +320,10 @@ def login_required(f):
 
 async def generate_image(prompt):
     """Generate image from prompt using Gradio Client with key rotation and retry."""
+    if not prompt:
+        print("--- Image Generation: Skipped due to empty prompt. ---")
+        return None
+
     max_cycles = 3  # Try the full list of keys 3 times
 
     for cycle in range(max_cycles):
@@ -719,112 +723,106 @@ async def analyze_story_characters(story_data):
         return None
 
 async def generate_all_image_prompts(story_data):
-    """Create all image prompts for the story using Gemini, ensuring consistency."""
-    try:
-        char_db = story_data.get('character_database', {})
-        style_data = story_data.get('style_guide')
-        style_context = ""
-        
-        if style_data:
-            art_style = style_data.get('art_style', {})
-            style_context = f'''
-            Art style requirements (MUST follow exactly):
-            - Style: {art_style.get('overall_style', '')}
-            - Colors: {art_style.get('color_palette', '')}
-            - Lighting: {art_style.get('lighting', '')}
-            - Composition: {art_style.get('composition', '')}
-            - Texture: {art_style.get('texture', '')}
-            - Perspective: {art_style.get('perspective', '')}
-            '''
-
-        paragraphs_json = json.dumps(story_data['paragraphs'], indent=2)
-
-        prompt_for_gemini = f'''
-You are a visual artist creating prompts for an AI image generator. 
-Your task is to create a detailed image generation prompt for EACH paragraph in the story provided, while maintaining STRICT character and style consistency across all images.
-
-**Story Paragraphs:**
-{paragraphs_json}
-
-**Instructions:**
-1.  **Analyze Characters and Scenes:** For each paragraph, identify the characters, their emotional state, and the scene.
-2.  **Apply Consistent Descriptions:** Use the provided Character Database to ensure characters look the same in every image. Apply `expression_override` or `appearance_change` based on the context of each paragraph.
-3.  **Construct Prompts:** Create a list of detailed image prompts, one for each paragraph. Each prompt must:
-    - Start with the EXACT, combined character descriptions for that scene.
-    - Describe the scene/action from the paragraph.
-    - Adhere to the Art Style Guide.
-    - Be between 75-100 words.
-    - Follow the format: [character descriptions], [scene/action description], [art style], [mood], [lighting].
-4.  **Ensure Consistency:** The prompts should tell a cohesive visual story, with consistent characters and environments.
-
-**Provided Information:**
-
-**1. Character Database:**
-{json.dumps(char_db, indent=2)}
-
-**2. Art Style Guide:**
-{style_context}
-
-**Final Output:**
-Return ONLY a JSON object in this format, with a list of prompts matching the number of paragraphs.
-{{
-    "image_prompts": [
-        "The final, detailed image prompt for paragraph 1.",
-        "The final, detailed image prompt for paragraph 2.",
-        ...
-    ]
-}}
-'''
-        
-        safety_settings = {
-            genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-        }
-
-        image_prompts_response = await generate_with_fallback(prompt_for_gemini, safety_settings=safety_settings)
-        
-        if not image_prompts_response:
-            print("Failed to generate image prompts after multiple retries.")
-            return ["A beautiful illustration in digital art style, vibrant colors, detailed"] * len(story_data['paragraphs'])
-        
+    """Create all image prompts for the story using Gemini, with retry and fallback."""
+    
+    for attempt in range(3):
+        print(f"--- Image Prompt Generation: Attempt {attempt + 1}/3 ---")
         try:
+            char_db = story_data.get('character_database', {})
+            style_data = story_data.get('style_guide')
+            style_context = ""
+            
+            if style_data:
+                art_style = style_data.get('art_style', {})
+                style_context = f'''
+                Art style requirements (MUST follow exactly):
+                - Style: {art_style.get('overall_style', '')}
+                - Colors: {art_style.get('color_palette', '')}
+                - Lighting: {art_style.get('lighting', '')}
+                - Composition: {art_style.get('composition', '')}
+                - Texture: {art_style.get('texture', '')}
+                - Perspective: {art_style.get('perspective', '')}
+                '''
+
+            paragraphs_json = json.dumps(story_data['paragraphs'], indent=2)
+
+            prompt_for_gemini = f'''
+    You are a visual artist creating prompts for an AI image generator. 
+    Your task is to create a detailed image generation prompt for EACH paragraph in the story provided, while maintaining STRICT character and style consistency across all images.
+
+    **Story Paragraphs:**
+    {paragraphs_json}
+
+    **Instructions:**
+    1.  **Analyze Characters and Scenes:** For each paragraph, identify the characters, their emotional state, and the scene.
+    2.  **Apply Consistent Descriptions:** Use the provided Character Database to ensure characters look the same in every image. Apply `expression_override` or `appearance_change` based on the context of each paragraph.
+    3.  **Construct Prompts:** Create a list of detailed image prompts, one for each paragraph. Each prompt must:
+        - Start with the EXACT, combined character descriptions for that scene.
+        - Describe the scene/action from the paragraph.
+        - Adhere to the Art Style Guide.
+        - Be between 75-100 words.
+        - Follow the format: [character descriptions], [scene/action description], [art style], [mood], [lighting].
+    4.  **Ensure Consistency:** The prompts should tell a cohesive visual story, with consistent characters and environments.
+
+    **Provided Information:**
+
+    **1. Character Database:**
+    {json.dumps(char_db, indent=2)}
+
+    **2. Art Style Guide:**
+    {style_context}
+
+    **Final Output:**
+    Return ONLY a JSON object in this format, with a list of prompts matching the number of paragraphs.
+    {{
+        "image_prompts": [
+            "The final, detailed image prompt for paragraph 1.",
+            "The final, detailed image prompt for paragraph 2.",
+            ...
+        ]
+    }}
+    '''
+            
+            safety_settings = {
+                genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+                genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
+                genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+                genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            }
+
+            image_prompts_response = await generate_with_fallback(prompt_for_gemini, safety_settings=safety_settings)
+            
+            if not image_prompts_response:
+                print("Failed to get a response from Gemini for image prompts.")
+                continue
+
             response_text = image_prompts_response.text.strip()
             response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
-            
-            # Remove trailing commas before closing brackets and braces
             response_text = re.sub(r',(\s*\])', r'\1', response_text)
             response_text = re.sub(r',(\s*\})', r'\1', response_text)
             
             prompts_data = json.loads(response_text)
             prompts = prompts_data.get("image_prompts", [])
             
-            # Clean up each prompt
+            if not prompts:
+                raise ValueError("Generated JSON is missing the 'image_prompts' key or the list is empty.")
+
             cleaned_prompts = [re.sub(r'["\'\n]', '', p) for p in prompts]
             
             if len(cleaned_prompts) != len(story_data['paragraphs']):
-                print(f"Warning: Mismatch in number of prompts ({len(cleaned_prompts)}) and paragraphs ({len(story_data['paragraphs'])}).")
-                # Pad the list with default prompts to match the paragraph count
-                num_missing = len(story_data['paragraphs']) - len(cleaned_prompts)
-                if num_missing > 0:
-                    print(f"Padding with {num_missing} default prompt(s).")
-                    cleaned_prompts.extend(["A beautiful illustration in digital art style, vibrant colors, detailed"] * num_missing)
-                else:
-                    # If there are more prompts than paragraphs, truncate the extra ones
-                    print(f"Truncating {abs(num_missing)} extra prompt(s).")
-                    cleaned_prompts = cleaned_prompts[:len(story_data['paragraphs'])]
+                raise ValueError(f"Mismatch in number of prompts ({len(cleaned_prompts)}) and paragraphs ({len(story_data['paragraphs'])}).")
 
+            print("--- Image Prompt Generation: Success! ---")
             return cleaned_prompts
+
         except (json.JSONDecodeError, ValueError) as e:
-            print(f"Could not parse image prompts JSON: {e}")
-            print(f"Raw response: {image_prompts_response.text}")
-            return ["A beautiful illustration in digital art style, vibrant colors, detailed"] * len(story_data['paragraphs'])
+            print(f"--- Image Prompt Generation: Attempt {attempt + 1} failed due to parsing/validation error: {e} ---")
+            if attempt < 2:
+                print("--- Retrying... ---")
+            continue
 
-    except Exception as e:
-        print(f"Generate all image prompts error: {str(e)}")
-        return ["A beautiful illustration in digital art style, vibrant colors, detailed"] * len(story_data['paragraphs'])
-
+    print("--- Image Prompt Generation: All 3 attempts failed. Falling back to no images. ---")
+    return [None] * len(story_data['paragraphs'])
 
 @app.route('/')
 def index():
