@@ -27,6 +27,7 @@
     <div class="header">
         <a href="{{ url_for('index') }}" class="back-button">&larr; Home</a>
     </div>
+    {% if story %}
     <div id="title-screen">
         <h1>{{ story.title }}</h1>
         <button id="play-story-btn" class="pixel-button">Play Story</button>
@@ -34,7 +35,7 @@
     <div id="storybook" class="hidden">
         <a href="{{ url_for('index') }}" class="back-button-mobile">&larr;</a>
         <div id="page-container"></div>
-                <div id="page-number">
+        <div id="page-number">
             <span id="current-page"></span>
             <span>/</span>
             <span id="total-pages"></span>
@@ -46,12 +47,27 @@
             <a href="{{ url_for('export_pdf', story_uuid=story.story_uuid) }}" class="pixel-button"><i class="fas fa-file-pdf"></i><span class="tooltiptext">Export to PDF</span></a>
         </div>
     </div>
-    <input type="text" id="share-link" value="{{ request.url }}"> 
+    <input type="text" id="share-link" value="{{ request.url }}">
     <audio id="audio-player" controls class="hidden"></audio>
     <script id="story-data" type="application/json">{{ story|tojson|safe }}</script>
     <script>
         const storyData = JSON.parse(document.getElementById('story-data').textContent);
     </script>
+    {% else %}
+    <div class="overlay">
+        <div class="error-container">
+            {% if error == "database_down" %}
+                <h1><i class="fas fa-database-slash"></i> Database Connection Error</h1>
+                <p>We're having trouble connecting to our story database (shov.com). It might be temporarily down.</p>
+                <p>Please try again in a few moments.</p>
+            {% else %}
+                <h1><i class="fas fa-ghost"></i> Story Not Found</h1>
+                <p>The story you're looking for doesn't exist or has been moved. It's also possible that our database service, shov.com, is experiencing issues.</p>
+            {% endif %}
+            <a href="{{ url_for('index') }}" class="pixel-button">Go to Homepage</a>
+        </div>
+    </div>
+    {% endif %}
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     {% block scripts %}

@@ -98,7 +98,7 @@ def shov_add(collection_name, value):
     print(f"--- Shov Add --- PRE-REQUEST: Adding to collection '{collection_name}'")
     try:
         response = _shov_request_with_retry(f"{SHOV_API_URL}/add/{PROJECT_NAME}", headers=headers, json_data=data)
-        print(f"--- Shov Add --- POST-REQUEST: Status Code: {response.status_code}")
+        print(f"--- Shov Add --- POST-REQUEST: Status Code: {response.status_code}, Raw Response: {response.text}")
         response_json = response.json()
         print(f"--- Shov Add --- POST-REQUEST: JSON Response: {response_json}")
         return response_json
@@ -120,7 +120,9 @@ def shov_where(collection_name, filter_dict=None):
     
     try:
         response = _shov_request_with_retry(f"{SHOV_API_URL}/where/{PROJECT_NAME}", headers=headers, json_data=data)
-        return response.json()
+        result = response.json()
+        print(f"--- Shov Where --- INFO: Result: {result}")
+        return result
     except (requests.exceptions.RequestException, ConnectionResetError) as e:
         print(f"--- Shov Where --- FATAL: RequestException: {e}")
         return {"success": False, "error": "RequestException", "details": str(e), "items": []}
@@ -858,22 +860,31 @@ def get_story(title):
     """Get a story from the database"""
     decoded_title = unquote(title)
     story_response = shov_where('stories', {'title': decoded_title})
+    if not story_response.get('success', True):
+        return render_template('story_view.html', story=None, error="database_down"), 503
+
     stories = story_response.get('items', [])
     if stories:
         story = stories[0]['value']
         return render_template('story_view.html', story=story)
-    return "Story not found", 404
+    
+    return render_template('story_view.html', story=None, error="not_found"), 404
 
 
 @app.route('/view_story/<story_uuid>')
 def view_story(story_uuid):
     """Get a story from the database by ID"""
     story_response = shov_where('stories', {'story_uuid': story_uuid})
+    
+    if not story_response.get('success', True):
+        return render_template('story_view.html', story=None, error="database_down"), 503
+
     stories = story_response.get('items', [])
     if stories:
         story = stories[0]['value']
         return render_template('story_view.html', story=story)
-    return "Story not found", 404
+    
+    return render_template('story_view.html', story=None, error="not_found"), 404
 
 
 
@@ -1486,7 +1497,6 @@ def export_pdf(story_uuid):
         return response
 
     return "Story not found", 404
-
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
