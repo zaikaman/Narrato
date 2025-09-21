@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/driver.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/narrator.css') }}">
 </head>
-<body>
+<body data-narrator-image-url="{{ url_for('static', filename='images/narrator.png') }}">
     <div id="custom-driver-overlay"></div>
     {% include 'header.html' with context %}
     <div class="container mx-auto px-4 py-8">

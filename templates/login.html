@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/narrator.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/driver.min.css') }}">
 </head>
-<body>
+<body data-narrator-image-url="{{ url_for('static', filename='images/narrator.png') }}">
     <div class="header">
         <a href="{{ url_for('index') }}" class="back-button">&larr; Home</a>
     </div>

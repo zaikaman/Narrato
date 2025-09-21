@@ -1,7 +1,7 @@
 # Narrato: The AI-Powered Multimedia Storyteller
 
 <p align="center">
-  <img src="./static/images/logo-text.png" alt="Narrato Logo" width="400"/>
+  <img src="./narrato/static/images/logo-text.png" alt="Narrato Logo" width="400"/>
 </p>
 
 <p align="center">
@@ -115,7 +115,7 @@ You'll need to provide API keys for the various services used in the project.
 Once the dependencies are installed and your environment variables are set, you can start the Flask development server.
 
 ```bash
-python app.py
+python run.py
 ```
 
 The application will be available at `http://127.0.0.1:8080`.

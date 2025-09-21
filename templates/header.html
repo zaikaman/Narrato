@@ -1,6 +1,6 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/intro.css') }}">
 <div id="intro-overlay">
-    <img src="/static/images/narrator.png" alt="Narrator" id="intro-narrator">
+    <img src="{{ url_for('static', filename='images/narrator.png') }}" alt="Narrator" id="intro-narrator">
     <div id="intro-content">
         <h1>Welcome to Narrato!</h1>
         <p>We create stories here. Let me show you around.</p>
@@ -10,8 +10,8 @@
 <div class="flex justify-between items-center mb-8 header-container">
     <div class="flex items-center">
         <a href="{{ url_for('index') }}" class="flex items-center">
-            <img src="/static/images/logo.png" alt="Logo" class="h-16">
-            <img src="/static/images/logo-text.png" alt="Logo Text" class="h-12 ml-4">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="h-16">
+            <img src="{{ url_for('static', filename='images/logo-text.png') }}" alt="Logo Text" class="h-12 ml-4">
         </a>
     </div>
     <div class="flex items-center">

@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from shov_api import shov_send_otp, shov_verify_otp
+from ..services.shov_api import shov_send_otp, shov_verify_otp
 
 auth_bp = Blueprint('auth', __name__)
 

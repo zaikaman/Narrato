@@ -50,7 +50,7 @@ See the [Environment Variables](./environment.md) documentation for more details
 Once the dependencies are installed and the environment variables are set, you can run the Flask development server:
 
 ```bash
-python app.py
+python run.py
 ```
 
 The application will be available at `http://127.0.0.1:8080`.

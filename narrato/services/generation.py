@@ -1,7 +1,7 @@
 import asyncio
 import google.generativeai as genai
 from google.api_core import exceptions
-from key_manager import api_key_manager, speechify_api_key_manager, huggingface_api_key_manager
+from .key_manager import api_key_manager, speechify_api_key_manager, huggingface_api_key_manager
 import cloudinary
 import cloudinary.uploader
 from speechify import AsyncSpeechify

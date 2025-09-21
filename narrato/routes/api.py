@@ -3,8 +3,8 @@ import os
 import uuid
 import asyncio
 import traceback
-from shov_api import shov_add, shov_where, shov_update
-from generation import generate_story_content, generate_style_guide, analyze_story_characters, generate_all_image_prompts, generate_image, generate_voice
+from ..services.shov_api import shov_add, shov_where, shov_update
+from ..services.generation import generate_story_content, generate_style_guide, analyze_story_characters, generate_all_image_prompts, generate_image, generate_voice
 
 api_bp = Blueprint('api', __name__)
 

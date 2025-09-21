@@ -8,8 +8,8 @@ import base64
 from pathlib import Path
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from shov_api import shov_where, shov_remove, shov_contents
-from decorators import login_required
+from ..services.shov_api import shov_where, shov_remove, shov_contents
+from ..core.decorators import login_required
 
 story_bp = Blueprint('story', __name__)
 

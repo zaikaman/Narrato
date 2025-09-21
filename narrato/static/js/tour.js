@@ -30,7 +30,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Helper Elements ---
     const narrator = document.createElement('img');
-    narrator.src = '/static/images/narrator.png';
+        const narratorImageUrl = document.body.dataset.narratorImageUrl || '/static/images/narrator.png'; // Fallback for safety
+    narrator.src = narratorImageUrl;
     narrator.className = 'driver-narrator';
     document.body.appendChild(narrator);
 

@@ -2,8 +2,8 @@ from flask import Blueprint, request, Response, session
 import asyncio
 import json
 import traceback
-from shov_api import shov_where, shov_update, shov_add, shov_remove
-from generation import generate_story_content, generate_style_guide, analyze_story_characters, generate_all_image_prompts, generate_image, generate_voice
+from ..services.shov_api import shov_where, shov_update, shov_add, shov_remove
+from ..services.generation import generate_story_content, generate_style_guide, analyze_story_characters, generate_all_image_prompts, generate_image, generate_voice
 
 stream_bp = Blueprint('stream', __name__)
 
