@@ -44,3 +44,6 @@ venv/
 # Gemini
 GEMINI.md
 .gemini
+
+# Shov docs
+shov_docs.json
