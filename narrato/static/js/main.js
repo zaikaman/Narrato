@@ -199,9 +199,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         sessionStorage.setItem('isSubmitting', 'true');
 
+        const isMobile = window.innerWidth <= 768;
+        const alertText = isMobile 
+            ? "Hey there mobile user, please don't exit this browser or this generation process will pause, if it does pause, you can just refresh the page for it to continue"
+            : "We do not recommend closing or refreshing this page during story generation.";
+
         Swal.fire({
             title: 'Heads up!',
-            text: 'We do not recommend closing or refreshing this page during story generation.',
+            text: alertText,
             icon: 'info',
             confirmButtonText: 'Got it!',
             background: '#2a2a2a',
