@@ -40,3 +40,7 @@ Desktop.ini
 __pycache__/
 venv/
 .env
+
+# Gemini
+GEMINI.md
+.gemini
