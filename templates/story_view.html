@@ -44,7 +44,7 @@
         <button id="next-btn" class="pixel-button">&rarr;</button>
         <div class="actions">
             <button id="share-btn" class="pixel-button"><i class="fas fa-share-alt"></i><span class="tooltiptext">Share</span></button>
-            <a href="{{ url_for('export_pdf', story_uuid=story.story_uuid) }}" class="pixel-button"><i class="fas fa-file-pdf"></i><span class="tooltiptext">Export to PDF</span></a>
+            <a href="{{ url_for('story.export_pdf', story_uuid=story.story_uuid) }}" class="pixel-button"><i class="fas fa-file-pdf"></i><span class="tooltiptext">Export to PDF</span></a>
         </div>
     </div>
     <input type="text" id="share-link" value="{{ request.url }}">

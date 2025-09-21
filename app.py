@@ -23,16 +23,18 @@ from google.api_core import exceptions
 from gradio_client import Client 
 
 from shov_api import shov_set, shov_get, shov_contents, shov_add, shov_where, shov_send_otp, shov_verify_otp, shov_remove, shov_forget, shov_update
-
-from generation import generate_with_fallback
-
-
+from generation import generate_with_fallback, generate_story_content, generate_style_guide, analyze_story_characters, generate_all_image_prompts, generate_image, generate_voice
 from key_manager import api_key_manager, speechify_api_key_manager, huggingface_api_key_manager
+from decorators import login_required
 
 app = Flask(__name__)
 
 from auth_routes import auth_bp
 app.register_blueprint(auth_bp)
+
+from story_routes import story_bp
+app.register_blueprint(story_bp)
+
 app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
 
 cloudinary.config(
@@ -44,124 +46,9 @@ cloudinary.config(
 print(f"SHOV_API_KEY: {os.getenv('SHOV_API_KEY')}")
 print(f"SHOV_PROJECT: {os.getenv('SHOV_PROJECT')}")
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'email' not in session:
-            return redirect(url_for('auth.login', next=request.url))
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-# API keys are now managed by the APIKeyManager instances.
-# Global configuration is removed to allow for dynamic key rotation per request.
-
-from generation import generate_story_content, generate_style_guide, analyze_story_characters, generate_all_image_prompts, generate_image, generate_voice
-
 @app.route('/')
 def index():
     return render_template('index.html', show_browse_button=True)
-
-@app.route('/audio/<path:filename>')
-def serve_audio(filename):
-    try:
-        return send_file(filename, mimetype='audio/mpeg')
-    except Exception as e:
-        print(f"Error serving audio file: {str(e)}")
-        return jsonify({"error": "Could not play audio file"}), 404
-
-@app.route('/stories')
-def list_stories():
-    """List all stories in the database"""
-    return jsonify(shov_contents())
-
-from urllib.parse import unquote
-
-
-
-@app.route('/browse')
-def browse_stories():
-    """Browse all public stories"""
-    stories_response = shov_where('stories', {'public': True})
-    public_stories = stories_response.get('items', [])
-    return render_template('browse.html', stories=public_stories, show_browse_button=False)
-
-
-@app.route('/stories/<title>')
-def get_story(title):
-    """Get a story from the database"""
-    decoded_title = unquote(title)
-    story_response = shov_where('stories', {'title': decoded_title})
-    if not story_response.get('success', True):
-        return render_template('story_view.html', story=None, error="database_down"), 503
-
-    stories = story_response.get('items', [])
-    if stories:
-        story = stories[0]['value']
-        return render_template('story_view.html', story=story)
-    
-    return render_template('story_view.html', story=None, error="not_found"), 404
-
-
-@app.route('/view_story/<story_uuid>')
-def view_story(story_uuid):
-    """Get a story from the database by ID"""
-    story_response = shov_where('stories', {'story_uuid': story_uuid})
-    
-    if not story_response.get('success', True):
-        return render_template('story_view.html', story=None, error="database_down"), 503
-
-    stories = story_response.get('items', [])
-    if stories:
-        story = stories[0]['value']
-        return render_template('story_view.html', story=story)
-    
-    return render_template('story_view.html', story=None, error="not_found"), 404
-
-
-
-
-
-
-@app.route('/history')
-@login_required
-def story_history():
-    """Display user's story history"""
-    stories_response = shov_where('stories', {'email': session['email']})
-    user_stories = stories_response.get('items', [])
-    return render_template('history.html', stories=user_stories)
-
-@app.route('/delete_story', methods=['POST'])
-@login_required
-def delete_story():
-    """Delete a story."""
-    data = request.get_json()
-    story_id = data.get('story_id')
-
-    if not story_id:
-        return jsonify({"success": False, "error": "Invalid request: No story ID provided."} ), 400
-
-    # Verify ownership
-    stories_response = shov_where('stories', {'email': session['email']})
-    user_stories = stories_response.get('items', [])
-    owned_story_ids = [story['id'] for story in user_stories]
-    print(f"User owns stories with IDs: {owned_story_ids}")
-
-    if story_id in owned_story_ids:
-        print(f"User is authorized to delete story {story_id}. Proceeding with deletion.")
-        delete_response = shov_remove('stories', story_id)
-        print(f"shov_remove response: {delete_response}")
-
-        if delete_response.get('success'):
-            return jsonify({"success": True})
-        else:
-            error_msg = delete_response.get('error', 'Unknown error during deletion.')
-            return jsonify({"success": False, "error": error_msg}), 500
-    else:
-        print(f"User is NOT authorized to delete story {story_id}.")
-        return jsonify({"success": False, "error": "You are not authorized to delete this story."} ), 403
-
-
 
 # --- Production (Worker) Endpoints ---
 
@@ -557,6 +444,7 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
         yield progress_update('Error', 100, 100, {"error": str(e)})
 
 @app.route('/generate_story_stream', methods=['GET'])
+
 def generate_story_stream():
     try:
         prompt = request.args.get('prompt')
@@ -608,8 +496,7 @@ def generate_story_stream():
 
 from xhtml2pdf import pisa
 from io import BytesIO
-import requests
-import base64
+
 from pathlib import Path
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -633,62 +520,6 @@ def link_callback(uri, rel):
         return uri
 
     return uri
-
-@app.route('/export_pdf/<story_uuid>')
-def export_pdf(story_uuid):
-    """Export a story as a PDF"""
-    story_response = shov_where('stories', {'story_uuid': story_uuid})
-    stories = story_response.get('items', [])
-    if stories:
-        story = stories[0]['value']
-
-        # Register fonts
-        static_path = os.path.join(os.path.dirname(__file__), 'static')
-        medieval_font_path = os.path.join(static_path, 'MedievalSharp', 'MedievalSharp-Regular.ttf')
-        literata_font_path = os.path.join(static_path, 'Literata', 'Literata-VariableFont_opsz,wght.ttf')
-        
-        if os.path.exists(medieval_font_path):
-            pdfmetrics.registerFont(TTFont('MedievalSharp', medieval_font_path))
-        if os.path.exists(literata_font_path):
-            pdfmetrics.registerFont(TTFont('Literata', literata_font_path))
-
-        # Download images and convert to data URIs
-        if 'images' in story:
-            for image_data in story['images']:
-                if image_data.get('url') and image_data['url'].startswith('http'):
-                    try:
-                        response = requests.get(image_data['url'], timeout=10)
-                        response.raise_for_status()
-                        
-                        content_type = response.headers.get('Content-Type', 'image/jpeg')
-                        encoded_string = base64.b64encode(response.content).decode('utf-8')
-                        
-                        image_data['url'] = f"data:{content_type};base64,{encoded_string}"
-                    except requests.exceptions.RequestException as e:
-                        print(f"Could not fetch image {image_data['url']}: {e}")
-                        image_data['url'] = '' 
-
-        html = render_template('pdf_template.html', story=story)
-        
-        pdf_file = BytesIO()
-        pisa_status = pisa.CreatePDF(
-            BytesIO(html.encode('UTF-8')),
-            dest=pdf_file,
-            encoding='UTF-8',
-            link_callback=link_callback
-        )
-
-        if pisa_status.err:
-            print(f"PDF creation error: {pisa_status.err}")
-            return "Error creating PDF", 500
-
-        pdf_file.seek(0)
-        
-        response = Response(pdf_file.read(), mimetype='application/pdf')
-        response.headers['Content-Disposition'] = f'attachment; filename="{story["title"]}.pdf"'
-        return response
-
-    return "Story not found", 404
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)

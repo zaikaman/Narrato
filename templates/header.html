@@ -16,13 +16,13 @@
     </div>
     <div class="flex items-center">
         {% if show_browse_button %}
-        <a href="{{ url_for('browse_stories') }}" id="browse-button" class="pixel-button">Browse</a>
+        <a href="{{ url_for('story.browse_stories') }}" id="browse-button" class="pixel-button">Browse</a>
         {% endif %}
         {% if session['email'] %}
             <div class="dropdown ml-4">
                 <button class="pixel-button">Account</button>
                 <div class="dropdown-content">
-                    <a href="{{ url_for('story_history') }}" id="history-button">Story History</a>
+                    <a href="{{ url_for('story.story_history') }}" id="history-button">Story History</a>
                 </div>
             </div>
             <a href="{{ url_for('auth.logout') }}" class="ml-4 pixel-button logout-button">Logout</a>

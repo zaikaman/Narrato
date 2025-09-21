@@ -22,7 +22,7 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {% for story in stories %}
-                <a href="{{ url_for('view_story', story_uuid=story.value.story_uuid) }}" class="story-card bg-white rounded-lg shadow-lg overflow-hidden transform transition-transform duration-300 hover:scale-105">
+                <a href="{{ url_for('story.view_story', story_uuid=story.value.story_uuid) }}" class="story-card bg-white rounded-lg shadow-lg overflow-hidden transform transition-transform duration-300 hover:scale-105">
                     {% if story.value.images and story.value.images[0].url %}
                         <img src="{{ story.value.images[0].url }}" alt="{{ story.value.title }}" class="w-full h-48 object-cover">
                     {% else %}

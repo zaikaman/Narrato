@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/driver.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/narrator.css') }}">
 </head>
-<body data-delete-url="{{ url_for('delete_story') }}" data-flashed-messages="{{ get_flashed_messages(with_categories=true) | tojson | safe }}">
+<body data-delete-url="{{ url_for('story.delete_story') }}" data-flashed-messages="{{ get_flashed_messages(with_categories=true) | tojson | safe }}">
     <div id="custom-driver-overlay"></div>
     <div class="header">
         <a href="{{ url_for('index') }}" class="back-button">← Home</a>
@@ -27,7 +27,7 @@
                         <p>{{ story.value.paragraphs[0] }}...</p>
                         
                         <div class="story-item-actions">
-                            <a href="{{ url_for('get_story', title=story.value.title) }}" class="pixel-button read-story-button">Read Story</a>
+                            <a href="{{ url_for('story.get_story', title=story.value.title) }}" class="pixel-button read-story-button">Read Story</a>
                             <button class="pixel-button delete-story-button" onclick="handleDeleteClick('{{ story.id }}')">Delete</button>
                         </div>
                     </div>
