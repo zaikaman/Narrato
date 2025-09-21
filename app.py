@@ -30,6 +30,9 @@ from generation import generate_with_fallback
 from key_manager import api_key_manager, speechify_api_key_manager, huggingface_api_key_manager
 
 app = Flask(__name__)
+
+from auth_routes import auth_bp
+app.register_blueprint(auth_bp)
 app.secret_key = os.getenv("SECRET_KEY", "super-secret-key")
 
 cloudinary.config(
@@ -117,32 +120,7 @@ def view_story(story_uuid):
 
 
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        email = request.form['email']
-        shov_send_otp(email)
-        return redirect(url_for('verify', email=email))
-    return render_template('login.html')
 
-@app.route('/verify', methods=['GET', 'POST'])
-def verify():
-    email = request.args.get('email')
-    if request.method == 'POST':
-        pin = request.form['pin']
-        response = shov_verify_otp(email, pin)
-        if response.get('success'):
-            session['email'] = email
-            return redirect(url_for('index'))
-        else:
-            flash("Invalid OTP. Please try again.")
-            return redirect(url_for('verify', email=email))
-    return render_template('verify.html', email=email)
-
-@app.route('/logout')
-def logout():
-    session.pop('email', None)
-    return redirect(url_for('index'))
 
 
 @app.route('/history')
