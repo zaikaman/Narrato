@@ -184,7 +184,16 @@ def check_paragraph_length(paragraph):
 
 async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
     """Generate story content using Gemini"""
-    prompt_template = '''
+    if min_paragraphs == max_paragraphs:
+        paragraph_instruction = f"The story MUST have EXACTLY {max_paragraphs} paragraphs."
+        paragraph_range_doc = f"exactly {max_paragraphs}"
+        final_instruction = f"- {paragraph_instruction}"
+    else:
+        paragraph_instruction = f"Number of paragraphs should be between {min_paragraphs} and {max_paragraphs}."
+        paragraph_range_doc = f"between {min_paragraphs}-{max_paragraphs}"
+        final_instruction = f"- {paragraph_instruction}\n        - The story should feel complete, don't force it to exactly {max_paragraphs} paragraphs"
+
+    prompt_content = f'''
         You are a master storyteller writing an engaging and detailed story for a general audience. 
         Create a rich, vivid story based on this theme: {prompt}
 
@@ -215,7 +224,7 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
             "paragraphs": [
                 "First detailed paragraph text (under 30 words)",
                 "Second detailed paragraph text (under 30 words)",
-                ... (between {min_paragraphs}-{max_paragraphs} paragraphs)
+                ... ({paragraph_range_doc} paragraphs)
             ],
             "moral": "The moral lesson from the story"
         }}
@@ -225,13 +234,11 @@ async def generate_story_content(prompt, min_paragraphs, max_paragraphs):
         - Each paragraph must be under 30 words with rich details
         - Story should match the theme: {prompt}
         - Return ONLY the JSON object, no other text
-        - Number of paragraphs should be between {min_paragraphs} and {max_paragraphs}
-        - The story should feel complete, don't force it to exactly {max_paragraphs} paragraphs
+        {final_instruction}
         '''
     try:
         print(f"=== Starting generate_story_content ===")
         print(f"Input prompt: {prompt}")
-        prompt_content = prompt_template.format(prompt=prompt, min_paragraphs=min_paragraphs, max_paragraphs=max_paragraphs)
         english_story_response = await generate_with_fallback(prompt_content)
         response_text = english_story_response.text.strip()
         response_text = re.sub(r'```(?:json)?\s*|\s*```', '', response_text)
@@ -364,9 +371,10 @@ async def analyze_story_characters(story_data):
 
 async def generate_all_image_prompts(story_data):
     """Create all image prompts for the story using Gemini, with retry and fallback."""
+    num_paragraphs = len(story_data['paragraphs'])
     prompt_template = '''
     You are a visual artist creating prompts for an AI image generator. 
-    Your task is to create a detailed image generation prompt for EACH paragraph in the story provided, while maintaining STRICT character and style consistency across all images.
+    Your task is to create a detailed image generation prompt for EACH paragraph in the story provided, while maintaining STRICT character and style consistency across all images. Make sure the art style is the same in every image.
 
     **Story Paragraphs:**
     {paragraphs_json}
@@ -381,6 +389,7 @@ async def generate_all_image_prompts(story_data):
         - Be between 75-100 words.
         - Follow the format: [character descriptions], [scene/action description], [art style], [mood], [lighting].
     4.  **Ensure Consistency:** The prompts should tell a cohesive visual story, with consistent characters and environments.
+    5.  **Match Paragraph Count:** The number of prompts in the final `image_prompts` list MUST be exactly equal to the number of paragraphs provided. If you are given {num_paragraphs} paragraphs, you must generate {num_paragraphs} prompts.
 
     **Provided Information:**
 
@@ -391,7 +400,7 @@ async def generate_all_image_prompts(story_data):
     {style_context}
 
     **Final Output:**
-    Return ONLY a JSON object in this format, with a list of prompts matching the number of paragraphs.
+    Return ONLY a JSON object in this format. The `image_prompts` array must contain a prompt for every single paragraph provided. For example, if there are {num_paragraphs} paragraphs, there must be {num_paragraphs} strings in the `image_prompts` list.
     {{
         "image_prompts": [
             "The final, detailed image prompt for paragraph 1.",
@@ -400,7 +409,7 @@ async def generate_all_image_prompts(story_data):
         ]
     }}
     '''
-    for attempt in range(3):
+    for attempt in range(10):
         try:
             char_db = story_data.get('character_database', {})
             style_data = story_data.get('style_guide')
@@ -418,7 +427,12 @@ async def generate_all_image_prompts(story_data):
             paragraphs_json = json.dumps(story_data['paragraphs'], indent=2)
             char_db_json = json.dumps(char_db, indent=2)
 
-            prompt_for_gemini = prompt_template.format(paragraphs_json=paragraphs_json, char_db_json=char_db_json, style_context=style_context)
+            prompt_for_gemini = prompt_template.format(
+                paragraphs_json=paragraphs_json, 
+                char_db_json=char_db_json, 
+                style_context=style_context,
+                num_paragraphs=num_paragraphs
+            )
             
             safety_settings = {
                 genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,

@@ -189,6 +189,32 @@
                 promptOnly.addEventListener('change', function(){ if(this.checked) gen.checked = false; });
             }
         })();
+
+        // Add validation for paragraph inputs
+        (function() {
+            const maxParagraphsInput = document.getElementById('maxParagraphs');
+            const minParagraphsInput = document.getElementById('minParagraphs');
+
+            const enforceMax = (inputElement) => {
+                const value = parseInt(inputElement.value, 10);
+                if (value > 30) {
+                    inputElement.value = 30;
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Limit Exceeded',
+                        text: 'The maximum number of pages has been set to 30 to ensure optimal performance.',
+                        confirmButtonColor: '#4F46E5'
+                    });
+                }
+            };
+
+            if (maxParagraphsInput) {
+                maxParagraphsInput.addEventListener('input', () => enforceMax(maxParagraphsInput));
+            }
+            if (minParagraphsInput) {
+                minParagraphsInput.addEventListener('input', () => enforceMax(minParagraphsInput));
+            }
+        })();
     </script>
 
     <div id="manual-final-tip" class="driver-popover-item">

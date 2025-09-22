@@ -7,6 +7,10 @@ from ..services.generation import generate_story_content, generate_style_guide, 
 
 stream_bp = Blueprint('stream', __name__)
 
+# Define a semaphore to limit concurrent thread-based tasks
+CONCURRENCY_LIMIT = 4 # A safe number for a small Heroku dyno
+semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+
 async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_paragraphs, email, public, story_uuid=None):
     """Generate story and stream progress, with state saving."""
     
@@ -113,13 +117,16 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
                     start_index = len(image_data)
                     for i, p in enumerate(image_prompts[start_index:], start=start_index):
                         progress = 40 + int(30 * (i + 1) / num_prompts)
-                        image_task = asyncio.create_task(generate_image(p))
-                        while not image_task.done():
-                            try:
-                                await asyncio.wait_for(asyncio.shield(image_task), timeout=15)
-                            except asyncio.TimeoutError:
-                                yield progress_update(f'Generating image {i + 1} of {num_prompts}... (ping)', progress, 100)
-                        image_url = await image_task
+                        yield progress_update(f'Waiting for image slot {i + 1} of {num_prompts}...', progress, 100)
+                        async with semaphore:
+                            yield progress_update(f'Generating image {i + 1} of {num_prompts}...', progress, 100)
+                            image_task = asyncio.create_task(generate_image(p))
+                            while not image_task.done():
+                                try:
+                                    await asyncio.wait_for(asyncio.shield(image_task), timeout=15)
+                                except asyncio.TimeoutError:
+                                    yield progress_update(f'Generating image {i + 1} of {num_prompts}... (ping)', progress, 100)
+                            image_url = await image_task
                         
                         image_data.append({'url': image_url, 'prompt': p})
                         story_data['images'] = image_data
@@ -139,13 +146,16 @@ async def generate_story_for_stream(prompt, image_mode, min_paragraphs, max_para
                 start_index = len(audio_files)
                 for i, text in enumerate(texts_to_voice[start_index:], start=start_index):
                     progress = 75 + int(20 * (i + 1) / num_texts)
-                    audio_task = asyncio.create_task(generate_voice(text))
-                    while not audio_task.done():
-                        try:
-                            await asyncio.wait_for(asyncio.shield(audio_task), timeout=15)
-                        except asyncio.TimeoutError:
-                            yield progress_update(f'Generated audio {i + 1} of {num_texts}... (ping)', progress, 100)
-                    audio_url = await audio_task
+                    yield progress_update(f'Waiting for audio slot {i + 1} of {num_texts}...', progress, 100)
+                    async with semaphore:
+                        yield progress_update(f'Generating audio {i + 1} of {num_texts}...', progress, 100)
+                        audio_task = asyncio.create_task(generate_voice(text))
+                        while not audio_task.done():
+                            try:
+                                await asyncio.wait_for(asyncio.shield(audio_task), timeout=15)
+                            except asyncio.TimeoutError:
+                                yield progress_update(f'Generated audio {i + 1} of {num_texts}... (ping)', progress, 100)
+                        audio_url = await audio_task
 
                     audio_files.append(audio_url)
                     story_data['audio_files'] = audio_files
