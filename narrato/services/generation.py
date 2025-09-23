@@ -16,42 +16,44 @@ import os
 from gradio_client import Client
 
 async def generate_with_fallback(prompt, safety_settings=None):
-    """Generates content using Gemini with model fallback."""
+    """Generates content using Gemini with model fallback and key rotation."""
     models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
     last_exception = None
-
-    try:
-        api_key = await api_key_manager.get_least_used_key()
-        genai.configure(api_key=api_key)
-        print(f"Initialized Gemini for fallback generation.")
-    except Exception as e:
-        print(f"Failed to configure Gemini API key: {e}")
-        raise
+    num_keys = len(api_key_manager.keys)
 
     for model_name in models:
-        try:
-            print(f"Attempting generation with model: {model_name}")
-            model = genai.GenerativeModel(model_name)
-            
-            if safety_settings:
-                response = model.generate_content(prompt, safety_settings=safety_settings)
-            else:
-                response = model.generate_content(prompt)
-            
-            print(f"Successfully generated content with model: {model_name}")
-            return response
-        except exceptions.ResourceExhausted as e:
-            last_exception = e
-            print(f"Model {model_name} exhausted. Switching to next model. Error: {e}")
-            continue
-        except Exception as e:
-            print(f"An unexpected error occurred with model {model_name}: {e}")
-            last_exception = e
-            break
+        for i in range(num_keys):
+            api_key = ""
+            try:
+                api_key = await api_key_manager.get_next_key()
+                genai.configure(api_key=api_key)
+                print(f"Attempting generation with model: {model_name} using key ...{api_key[-4:]}")
+                
+                model = genai.GenerativeModel(model_name)
+                
+                if safety_settings:
+                    response = model.generate_content(prompt, safety_settings=safety_settings)
+                else:
+                    response = model.generate_content(prompt)
+                
+                print(f"Successfully generated content with model: {model_name}")
+                return response
+            except exceptions.ResourceExhausted as e:
+                last_exception = e
+                key_identifier = f"...{api_key[-4:]}" if api_key else "N/A"
+                print(f"Key {key_identifier} exhausted for model {model_name}. Switching to next key.")
+                continue
+            except Exception as e:
+                key_identifier = f"...{api_key[-4:]}" if api_key else "N/A"
+                print(f"An unexpected error occurred with model {model_name} and key {key_identifier}: {e}")
+                last_exception = e
+                break
+        
+        print(f"All keys failed for model {model_name}.")
 
     if last_exception:
         raise last_exception
-    raise Exception("Failed to generate content with all available models.")
+    raise Exception("Failed to generate content with all available models and keys.")
 
 async def generate_image(prompt):
     """Generate image from prompt using Gradio Client with key rotation and retry."""
