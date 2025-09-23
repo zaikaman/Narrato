@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, send_file, Response
 from urllib.parse import unquote
 import os
+import copy
 from xhtml2pdf import pisa
 from io import BytesIO
 import requests
@@ -106,6 +107,7 @@ def export_pdf(story_uuid):
     stories = story_response.get('items', [])
     if stories:
         story = stories[0]['value']
+        story = copy.deepcopy(story)
 
         static_path = os.path.join(os.path.dirname(__file__), '..' ,'static')
         medieval_font_path = os.path.join(static_path, 'MedievalSharp', 'MedievalSharp-Regular.ttf')
