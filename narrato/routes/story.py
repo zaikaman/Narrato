@@ -1,8 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, send_file, Response
 from urllib.parse import unquote
 import os
-import copy
-from xhtml2pdf import pisa
+from weasyprint import HTML
 from io import BytesIO
 import requests
 import base64
@@ -107,49 +106,12 @@ def export_pdf(story_uuid):
     stories = story_response.get('items', [])
     if stories:
         story = stories[0]['value']
-        story = copy.deepcopy(story)
-
-        static_path = os.path.join(os.path.dirname(__file__), '..' ,'static')
-        medieval_font_path = os.path.join(static_path, 'MedievalSharp', 'MedievalSharp-Regular.ttf')
-        literata_font_path = os.path.join(static_path, 'Literata', 'Literata-VariableFont_opsz,wght.ttf')
-        
-        if os.path.exists(medieval_font_path):
-            pdfmetrics.registerFont(TTFont('MedievalSharp', medieval_font_path))
-        if os.path.exists(literata_font_path):
-            pdfmetrics.registerFont(TTFont('Literata', literata_font_path))
-
-        if 'images' in story:
-            new_images = []
-            for image_data in story['images']:
-                new_image_data = image_data.copy()
-                if new_image_data.get('url') and new_image_data['url'].startswith('http'):
-                    try:
-                        response = requests.get(new_image_data['url'], timeout=10)
-                        response.raise_for_status()
-                        content_type = response.headers.get('Content-Type', 'image/jpeg')
-                        encoded_string = base64.b64encode(response.content).decode('utf-8')
-                        new_image_data['url'] = f"data:{content_type};base64,{encoded_string}"
-                    except requests.exceptions.RequestException as e:
-                        print(f"Could not fetch image {new_image_data['url']}: {e}")
-                        new_image_data['url'] = ''
-                new_images.append(new_image_data)
-            story['images'] = new_images
 
         html = render_template('pdf_template.html', story=story)
         
-        pdf_file = BytesIO()
-        pisa_status = pisa.CreatePDF(
-            BytesIO(html.encode('UTF-8')),
-            dest=pdf_file,
-            encoding='UTF-8'
-        )
+        pdf_file = HTML(string=html).write_pdf()
 
-        if pisa_status.err:
-            return "Error creating PDF", 500
-
-        pdf_file.seek(0)
-        
-        response = Response(pdf_file.read(), mimetype='application/pdf')
+        response = Response(pdf_file, mimetype='application/pdf')
         response.headers['Content-Disposition'] = f'attachment; filename="{story["title"]}.pdf"'
         return response
 

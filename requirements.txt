@@ -8,6 +8,6 @@ python-multipart
 aiohttp
 cloudinary
 git+https://github.com/SpeechifyInc/speechify-api-sdk-python
-xhtml2pdf
+weasyprint
 gunicorn
 gradio_client
