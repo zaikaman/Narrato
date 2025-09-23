@@ -119,17 +119,21 @@ def export_pdf(story_uuid):
             pdfmetrics.registerFont(TTFont('Literata', literata_font_path))
 
         if 'images' in story:
+            new_images = []
             for image_data in story['images']:
-                if image_data.get('url') and image_data['url'].startswith('http'):
+                new_image_data = image_data.copy()
+                if new_image_data.get('url') and new_image_data['url'].startswith('http'):
                     try:
-                        response = requests.get(image_data['url'], timeout=10)
+                        response = requests.get(new_image_data['url'], timeout=10)
                         response.raise_for_status()
                         content_type = response.headers.get('Content-Type', 'image/jpeg')
                         encoded_string = base64.b64encode(response.content).decode('utf-8')
-                        image_data['url'] = f"data:{content_type};base64,{encoded_string}"
+                        new_image_data['url'] = f"data:{content_type};base64,{encoded_string}"
                     except requests.exceptions.RequestException as e:
-                        print(f"Could not fetch image {image_data['url']}: {e}")
-                        image_data['url'] = '' 
+                        print(f"Could not fetch image {new_image_data['url']}: {e}")
+                        new_image_data['url'] = ''
+                new_images.append(new_image_data)
+            story['images'] = new_images
 
         html = render_template('pdf_template.html', story=story)
         
