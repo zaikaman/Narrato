@@ -6,8 +6,7 @@ from io import BytesIO
 import requests
 import base64
 from pathlib import Path
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+
 from ..services.shov_api import shov_where, shov_remove, shov_contents
 from ..core.decorators import login_required
 
