@@ -1,4 +1,4 @@
-# Narrato: The AI-Powered Multimedia Storyteller (Gemini-2.5-Flash Only)
+# Narrato: The AI-Powered Multimedia Storyteller
 
 <p align="center">
   <img src="./narrato/static/images/logo-text.png" alt="Narrato Logo" width="400"/>
@@ -19,8 +19,8 @@
 
 ## ✨ Features
 
--   **✍️ AI Story Generation:** Uses Gemini-2.5-Flash as the sole model to write engaging and creative stories.
--   **🎨 AI-Powered Illustrations:** Generates beautiful, consistent images for each paragraph using the Gemini-2.5-Flash model and a smart character analysis pipeline.
+-   **✍️ AI Story Generation:** Leverages Google's Gemini to write engaging and creative stories.
+-   **🎨 AI-Powered Illustrations:** Generates beautiful, consistent images for each paragraph using a Hugging Face Space and a smart character analysis pipeline.
 -   **🎤 AI-Powered Narration:** Converts the story text into high-quality audio narration with the Speechify API.
 -   **🤖 Intelligent Consistency Pipeline:** A unique, multi-step AI process analyzes the story to create a "character database" and "style guide," ensuring visual consistency across all illustrations.
 -   **🔐 User Authentication:** Secure, password-less login system using OTPs sent via email, powered by Shov.com.
@@ -32,7 +32,7 @@
 
 -   **Backend:** Python, Flask, Gunicorn
 -   **Frontend:** HTML5, CSS3, JavaScript
--   **AI Services:** Gemini-2.5-Flash, Hugging Face, Speechify
+-   **AI Services:** Google Gemini, Hugging Face, Speechify
 -   **Database & Storage:** Shov.com (Key-Value DB), Cloudinary (Media Storage)
 -   **Deployment:** Heroku
 
@@ -40,11 +40,11 @@
 
 Narrato's magic lies in its state-of-the-art AI pipeline that ensures a high-quality, consistent output.
 
-1.  **Prompt -> Story:** You provide a prompt. Gemini-2.5-Flash writes a complete story with a title, paragraphs, and a moral.
-2.  **Story -> Analysis:** The application uses **Gemini-2.5-Flash** again to read the generated story and create two crucial documents:
+1.  **Prompt -> Story:** You provide a prompt. **Google Gemini** writes a complete story with a title, paragraphs, and a moral.
+2.  **Story -> Analysis:** The application uses **Gemini** again to read the generated story and create two crucial documents:
     *   **Character Database:** Detailed descriptions of every character's appearance, clothing, and expressions.
     *   **Art Style Guide:** A consistent guide for color palette, lighting, and overall artistic style.
-3.  **Analysis -> Image Prompts:** With the story, character database, and style guide, **Gemini-2.5-Flash** crafts highly detailed, consistent prompts for the image generation AI for every single paragraph.
+3.  **Analysis -> Image Prompts:** With the story, character database, and style guide, **Gemini** crafts highly detailed, consistent prompts for the image generation AI for *every single paragraph*.
 4.  **Prompts -> Images:** The prompts are sent to a **Hugging Face Space** to generate illustrations. The results are stored in **Cloudinary**.
 5.  **Text -> Audio:** The story's title and paragraphs are sent to the **Speechify API** to generate audio narration, which is also stored in **Cloudinary**.
 6.  **Assembly:** The final story—with text, images, and audio—is assembled and saved to the user's history using **Shov.com**.
@@ -87,7 +87,7 @@ cd autoaistory
 
 # Create and activate a virtual environment
 python -m venv venv
-# On Windows: .\\venv\\Scripts\\activate
+# On Windows: .\venv\Scripts\activate
 # On macOS/Linux: source venv/bin/activate
 ```
 
@@ -109,13 +109,13 @@ SECRET_KEY="a_very_strong_and_random_secret_key"
 SHOV_API_KEY="your_shov_api_key"
 SHOV_PROJECT="your_shov_project_name"
 
-# Gemini-2.5-Flash Keys
+# Google Gemini API Keys (add as many as you have, e.g., GOOGLE_API_KEY_2)
 GOOGLE_API_KEY="your_google_gemini_api_key_1"
 
 # Speechify API Keys
 SPEECHIFY_KEY="your_speechify_api_key_1"
 
-# Hugging Face for Image Generation
+# Hugging Face for Image Generation (add as many as you have, e.g., HUGGING_FACE_TOKEN_2)
 HUGGING_FACE_TOKEN="your_hugging_face_token_1"
 
 # Cloudinary for Media Storage
