@@ -1,4 +1,4 @@
-# Narrato: The AI-Powered Multimedia Storyteller (Gemini-2.5-Flash Only)
+# Narrato: The AI-Powered Multimedia Storyteller (Gemini-2.5-Flash Only) - Cleaned of extraneous Gemini models
 
 <p align="center">
   <img src="./narrato/static/images/logo-text.png" alt="Narrato Logo" width="400"/>
