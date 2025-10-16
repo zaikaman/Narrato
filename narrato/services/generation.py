@@ -17,7 +17,7 @@ from gradio_client import Client
 
 async def generate_with_fallback(prompt, safety_settings=None):
     """Generates content using Gemini with model fallback and key rotation."""
-    models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    models = ['gemini-2.5-pro', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-2.0-flash']
     last_exception = None
     num_keys = len(api_key_manager.keys)
 
@@ -140,7 +140,7 @@ async def generate_voice(text):
     try:
         speechify_key = await speechify_api_key_manager.get_next_key()
         speechify_client = AsyncSpeechify(token=speechify_key)
-        ssml_input = f'<speak><speechify:style emotion="assertive">{text}</speechify:style></speak>'
+        ssml_input = f'<speak><speechify:style emotion=\"assertive\">{text}</speechify:style></speak>'
         response = await speechify_client.tts.audio.speech(
             input=ssml_input,
             voice_id="oliver",
@@ -329,10 +329,6 @@ async def analyze_story_characters(story_data):
                         {{
                             "trigger_keywords": ["sad", "crying", "upset"],
                             "expression_override": "Detailed description of sad expression and posture"
-                        }},
-                        {{
-                            "trigger_keywords": ["happy", "joyful", "laughing"],
-                            "expression_override": "Detailed description of happy expression and posture"
                         }}
                     ],
                     "relationships": ["Relationship with other characters"],
