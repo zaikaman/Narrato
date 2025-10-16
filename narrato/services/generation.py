@@ -17,7 +17,7 @@ from gradio_client import Client
 
 async def generate_with_fallback(prompt, safety_settings=None):
     """Generates content using Gemini with model fallback and key rotation."""
-    models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    models = ['gemini-2.5-flash']
     last_exception = None
     num_keys = len(api_key_manager.keys)
 
@@ -157,7 +157,7 @@ async def generate_voice(text):
             public_id=f"{uuid.uuid4()}"
         )
         os.remove(temp_audio_path)
-        cloudinary_url = upload_result.get('secure_url')
+        cloudinary_url = upload_result.get("secure_url")
         print(f"Audio uploaded to Cloudinary: {cloudinary_url}")
         return cloudinary_url
     except Exception as e:
