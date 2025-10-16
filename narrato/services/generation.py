@@ -17,7 +17,7 @@ from gradio_client import Client
 
 async def generate_with_fallback(prompt, safety_settings=None):
     """Generates content using Gemini with model fallback and key rotation."""
-    models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    models = ['gemini-2.5-flash']
     last_exception = None
     num_keys = len(api_key_manager.keys)
 
@@ -300,7 +300,7 @@ async def generate_style_guide(story_data):
         return style_data
     except Exception as e:
         print(f"Error generating style guide: {e}")
-        return {"art_style": {"overall_style": "Digital art style with realistic details", "color_palette": "Rich, vibrant colors with deep contrasts", "lighting": "Dramatic lighting with strong highlights and shadows", "composition": "Dynamic, cinematic compositions", "texture": "Detailed textures with fine grain", "perspective": "Varied angles to enhance dramatic effect"}}
+        return {"art_style": {"overall_style": "Digital art style with realistic details", "color_palette": "Rich, vibrant colors with deep contrasts", "Lighting": "Dramatic lighting with strong highlights and shadows", "composition": "Dynamic, cinematic compositions", "texture": "Detailed textures with fine grain", "perspective": "Varied angles to enhance dramatic effect"}}
 
 async def analyze_story_characters(story_data):
     """Analyze and create consistent descriptions for all characters in the story"""
