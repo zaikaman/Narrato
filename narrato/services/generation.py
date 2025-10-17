@@ -17,7 +17,7 @@ from gradio_client import Client
 
 async def generate_with_fallback(prompt, safety_settings=None):
     """Generates content using Gemini with model fallback and key rotation."""
-    models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    models = ['gemini-2.5-pro']
     last_exception = None
     num_keys = len(api_key_manager.keys)
 
@@ -329,10 +329,6 @@ async def analyze_story_characters(story_data):
                         {{
                             "trigger_keywords": ["sad", "crying", "upset"],
                             "expression_override": "Detailed description of sad expression and posture"
-                        }},
-                        {{
-                            "trigger_keywords": ["happy", "joyful", "laughing"],
-                            "expression_override": "Detailed description of happy expression and posture"
                         }}
                     ],
                     "relationships": ["Relationship with other characters"],
@@ -391,7 +387,7 @@ async def generate_all_image_prompts(story_data):
         - Be between 75-100 words.
         - Follow the format: [character descriptions], [scene/action description], [art style], [mood], [lighting].
     4.  **Ensure Consistency:** The prompts should tell a cohesive visual story, with consistent characters and environments.
-    5.  **Match Paragraph Count:** The number of prompts in the final `image_prompts` list MUST be exactly equal to the number of paragraphs provided. If you are given {num_paragraphs} paragraphs, you must generate {num_paragraphs} prompts.
+    5.  **Match Paragraph Count:** The prompts in the final `image_prompts` list MUST be exactly equal to the number of paragraphs provided. If you are given {num_paragraphs} paragraphs, you must generate {num_paragraphs} prompts.
 
     **Provided Information:**
 
@@ -458,7 +454,7 @@ async def generate_all_image_prompts(story_data):
             if not prompts:
                 raise ValueError("Generated JSON is missing the 'image_prompts' key or the list is empty.")
 
-            cleaned_prompts = [re.sub(r'["\'\n]', '', p) for p in prompts]
+            cleaned_prompts = [re.sub(r'["\\\n]', '', p) for p in prompts]
             
             if len(cleaned_prompts) != len(story_data['paragraphs']):
                 raise ValueError(f"Mismatch in number of prompts ({len(cleaned_prompts)}) and paragraphs ({len(story_data['paragraphs'])}).")
