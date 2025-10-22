@@ -19,10 +19,10 @@
 
 ## ✨ Features
 
--   **✍️ AI Story Generation:** Leverages Google's Gemini to write engaging and creative stories.
+-   **✍️ AI Story Generation:** Uses Gemini 2.5 Pro (gemini-2.5-pro) as the sole model for all AI story generation tasks.
 -   **🎨 AI-Powered Illustrations:** Generates beautiful, consistent images for each paragraph using a Hugging Face Space and a smart character analysis pipeline.
 -   **🎤 AI-Powered Narration:** Converts the story text into high-quality audio narration with the Speechify API.
--   **🤖 Intelligent Consistency Pipeline:** A unique, multi-step AI process analyzes the story to create a "character database" and "style guide," ensuring visual consistency across all illustrations.
+-   **🤖 Intelligent Consistency Pipeline:** A unique, multi-step AI process analyzes the story to create a \"character database\" and \"style guide,\" ensuring visual consistency across all illustrations.
 -   **🔐 User Authentication:** Secure, password-less login system using OTPs sent via email, powered by Shov.com.
 -   **📚 Story Library:** Users can view their personal story history and browse public stories created by others.
 -   **📤 PDF Export:** Export your favorite stories into a beautifully formatted PDF book, complete with illustrations.
@@ -87,7 +87,7 @@ cd autoaistory
 
 # Create and activate a virtual environment
 python -m venv venv
-# On Windows: .\venv\Scripts\activate
+# On Windows: .\\venv\\Scripts\\activate
 # On macOS/Linux: source venv/bin/activate
 ```
 
@@ -110,7 +110,7 @@ SHOV_API_KEY="your_shov_api_key"
 SHOV_PROJECT="your_shov_project_name"
 
 # Google Gemini API Keys (add as many as you have, e.g., GOOGLE_API_KEY_2)
-GOOGLE_API_KEY="your_google_gemini_api_key_1"
+GOOGLE_API_KEY_1="your_gemini_2_5_pro_api_key_1"
 
 # Speechify API Keys
 SPEECHIFY_KEY="your_speechify_api_key_1"
