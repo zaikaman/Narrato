@@ -16,18 +16,18 @@ import os
 from gradio_client import Client
 
 async def generate_with_fallback(prompt, safety_settings=None):
-    """Generates content using Gemini with model fallback and key rotation."""
-    models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    """Generates content using Gemini with gemini-2.5-pro and key rotation."""
+    models = ['gemini-2.5-pro']
     last_exception = None
     num_keys = len(api_key_manager.keys)
 
-    for model_name in models:
+    for model_name in models:  # Only gemini-2.5-pro
         for i in range(num_keys):
             api_key = ""
             try:
                 api_key = await api_key_manager.get_next_key()
                 genai.configure(api_key=api_key)
-                print(f"Attempting generation with model: {model_name} using key ...{api_key[-4:]}")
+                print(f"Attempting generation with gemini-2.5-pro using key ...{api_key[-4:]}")
                 
                 model = genai.GenerativeModel(model_name)
                 
@@ -36,7 +36,7 @@ async def generate_with_fallback(prompt, safety_settings=None):
                 else:
                     response = model.generate_content(prompt)
                 
-                print(f"Successfully generated content with model: {model_name}")
+                print(f"Successfully generated content with gemini-2.5-pro")
                 return response
             except exceptions.ResourceExhausted as e:
                 last_exception = e
@@ -45,11 +45,11 @@ async def generate_with_fallback(prompt, safety_settings=None):
                 continue
             except Exception as e:
                 key_identifier = f"...{api_key[-4:]}" if api_key else "N/A"
-                print(f"An unexpected error occurred with model {model_name} and key {key_identifier}: {e}")
+                print(f"An unexpected error occurred with gemini-2.5-pro and key {key_identifier}: {e}")
                 last_exception = e
                 break
         
-        print(f"All keys failed for model {model_name}.")
+        print(f"All keys failed for gemini-2.5-pro.")
 
     if last_exception:
         raise last_exception
