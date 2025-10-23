@@ -17,7 +17,7 @@ from gradio_client import Client
 
 async def generate_with_fallback(prompt, safety_settings=None):
     """Generates content using Gemini with model fallback and key rotation."""
-    models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    models = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite']
     last_exception = None
     num_keys = len(api_key_manager.keys)
 
