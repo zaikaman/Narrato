@@ -19,7 +19,7 @@
 
 ## ✨ Features
 
--   **✍️ AI Story Generation:** Leverages Google's Gemini to write engaging and creative stories.
+-   **✍️ AI Story Generation:** Leverages Google Gemini (gemini-2.5-pro) to write engaging and creative stories.
 -   **🎨 AI-Powered Illustrations:** Generates beautiful, consistent images for each paragraph using a Hugging Face Space and a smart character analysis pipeline.
 -   **🎤 AI-Powered Narration:** Converts the story text into high-quality audio narration with the Speechify API.
 -   **🤖 Intelligent Consistency Pipeline:** A unique, multi-step AI process analyzes the story to create a "character database" and "style guide," ensuring visual consistency across all illustrations.
@@ -32,7 +32,7 @@
 
 -   **Backend:** Python, Flask, Gunicorn
 -   **Frontend:** HTML5, CSS3, JavaScript
--   **AI Services:** Google Gemini, Hugging Face, Speechify
+-   **AI Services:** Google Gemini (gemini-2.5-pro), Hugging Face, Speechify
 -   **Database & Storage:** Shov.com (Key-Value DB), Cloudinary (Media Storage)
 -   **Deployment:** Heroku
 
@@ -40,11 +40,11 @@
 
 Narrato's magic lies in its state-of-the-art AI pipeline that ensures a high-quality, consistent output.
 
-1.  **Prompt -> Story:** You provide a prompt. **Google Gemini** writes a complete story with a title, paragraphs, and a moral.
-2.  **Story -> Analysis:** The application uses **Gemini** again to read the generated story and create two crucial documents:
+1.  **Prompt -> Story:** You provide a prompt. **Google Gemini (gemini-2.5-pro)** writes a complete story with a title, paragraphs, and a moral.
+2.  **Story -> Analysis:** The application uses **Google Gemini (gemini-2.5-pro)** again to read the generated story and create two crucial documents:
     *   **Character Database:** Detailed descriptions of every character's appearance, clothing, and expressions.
     *   **Art Style Guide:** A consistent guide for color palette, lighting, and overall artistic style.
-3.  **Analysis -> Image Prompts:** With the story, character database, and style guide, **Gemini** crafts highly detailed, consistent prompts for the image generation AI for *every single paragraph*.
+3.  **Analysis -> Image Prompts:** With the story, character database, and style guide, **Google Gemini (gemini-2.5-pro)** crafts highly detailed, consistent prompts for the image generation AI for *every single paragraph*.
 4.  **Prompts -> Images:** The prompts are sent to a **Hugging Face Space** to generate illustrations. The results are stored in **Cloudinary**.
 5.  **Text -> Audio:** The story's title and paragraphs are sent to the **Speechify API** to generate audio narration, which is also stored in **Cloudinary**.
 6.  **Assembly:** The final story—with text, images, and audio—is assembled and saved to the user's history using **Shov.com**.
@@ -109,8 +109,8 @@ SECRET_KEY="a_very_strong_and_random_secret_key"
 SHOV_API_KEY="your_shov_api_key"
 SHOV_PROJECT="your_shov_project_name"
 
-# Google Gemini API Keys (add as many as you have, e.g., GOOGLE_API_KEY_2)
-GOOGLE_API_KEY="your_google_gemini_api_key_1"
+# Google Gemini (gemini-2.5-pro) API Keys (add as many as you have, e.g., GOOGLE_API_KEY_2)
+GOOGLE_API_KEY="your_google_gemini_2_5_pro_api_key"
 
 # Speechify API Keys
 SPEECHIFY_KEY="your_speechify_api_key_1"
